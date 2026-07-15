@@ -1,0 +1,3 @@
+--586b4eb--2015-06-15--Adam Tornhill--Fix the parser
+35	0	src/code_maat/parsers/git2.clj
+-	-	docs/logo.png

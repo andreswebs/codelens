@@ -1,0 +1,7 @@
+---
+MD003:
+  style: atx # heading style: ATX only. Agent skills (SKILL.md) require ATX and get corrupted when --fix converts headings to setext (setext cannot represent h3+).
+MD013: false # line-length
+MD025:
+  front_matter_title: "" # do not treat frontmatter title as an H1
+MD060: false # table pipe alignment

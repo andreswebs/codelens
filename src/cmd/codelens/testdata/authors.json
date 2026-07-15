@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":true,"analysis":"authors","row_count":4,"rows":[{"entity":"src/code_maat/parsers/git2.clj","n_authors":2,"n_revs":2},{"entity":"src/code_maat/parsers/git.clj","n_authors":1,"n_revs":2},{"entity":"doc/architecture.png","n_authors":1,"n_revs":1},{"entity":"src/code_maat/analysis/authors.clj","n_authors":1,"n_revs":1}]}

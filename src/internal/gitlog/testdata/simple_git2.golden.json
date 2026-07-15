@@ -1,0 +1,68 @@
+[
+  {
+    "Entity": "src/code_maat/parsers/git.clj",
+    "Rev": "51e5087",
+    "Date": "2013-10-31",
+    "Author": "Adam Petersen",
+    "Message": "First commit",
+    "LocAdded": 15,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "src/code_maat/parsers/git2.clj",
+    "Rev": "f5c6d3a",
+    "Date": "2013-11-01",
+    "Author": "Adam Petersen",
+    "Message": "Add git2 parser",
+    "LocAdded": 25,
+    "LocDeleted": 2,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "src/code_maat/parsers/git.clj",
+    "Rev": "f5c6d3a",
+    "Date": "2013-11-01",
+    "Author": "Adam Petersen",
+    "Message": "Add git2 parser",
+    "LocAdded": 6,
+    "LocDeleted": 1,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "src/code_maat/analysis/authors.clj",
+    "Rev": "3fb4c9e",
+    "Date": "2013-11-02",
+    "Author": "Carl Petersen",
+    "Message": "Wire up analysis",
+    "LocAdded": 17,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "doc/architecture.png",
+    "Rev": "3fb4c9e",
+    "Date": "2013-11-02",
+    "Author": "Carl Petersen",
+    "Message": "Wire up analysis",
+    "LocAdded": 0,
+    "LocDeleted": 0,
+    "Binary": true,
+    "HasLoc": true
+  },
+  {
+    "Entity": "src/code_maat/parsers/git2.clj",
+    "Rev": "8a2e10d",
+    "Date": "2013-11-03",
+    "Author": "Adam Tornhill",
+    "Message": "Refactor parser",
+    "LocAdded": 3,
+    "LocDeleted": 3,
+    "Binary": false,
+    "HasLoc": true
+  }
+]

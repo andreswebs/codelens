@@ -1,0 +1,35 @@
+[
+  {
+    "Entity": "a.go",
+    "Rev": "77c8751",
+    "Date": "2015-06-15",
+    "Author": "Mr Y",
+    "Message": "Merge pull request #42",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "b.go",
+    "Rev": "77c8751",
+    "Date": "2015-06-15",
+    "Author": "Mr Y",
+    "Message": "Merge pull request #42",
+    "LocAdded": 2,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "a.go",
+    "Rev": "b0d1e5f",
+    "Date": "2015-06-16",
+    "Author": "Adam Tornhill",
+    "Message": "Follow-up fix",
+    "LocAdded": 4,
+    "LocDeleted": 1,
+    "Binary": false,
+    "HasLoc": true
+  }
+]

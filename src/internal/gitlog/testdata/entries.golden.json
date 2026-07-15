@@ -1,0 +1,68 @@
+[
+  {
+    "Entity": "a.go",
+    "Rev": "b777738",
+    "Date": "2015-01-01",
+    "Author": "Alice",
+    "Message": "Initial import",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "b.go",
+    "Rev": "b777738",
+    "Date": "2015-01-01",
+    "Author": "Alice",
+    "Message": "Initial import",
+    "LocAdded": 3,
+    "LocDeleted": 2,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "c.go",
+    "Rev": "a527b79",
+    "Date": "2015-01-02",
+    "Author": "Bob",
+    "Message": "Wire up modules",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "d.go",
+    "Rev": "a527b79",
+    "Date": "2015-01-02",
+    "Author": "Bob",
+    "Message": "Wire up modules",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "e.go",
+    "Rev": "a527b79",
+    "Date": "2015-01-02",
+    "Author": "Bob",
+    "Message": "Wire up modules",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "f.go",
+    "Rev": "a527b79",
+    "Date": "2015-01-02",
+    "Author": "Bob",
+    "Message": "Wire up modules",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  }
+]

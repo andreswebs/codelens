@@ -1,0 +1,24 @@
+[
+  {
+    "Entity": "src/code_maat/parsers/git.clj",
+    "Rev": "990442e",
+    "Date": "2013-08-29",
+    "Author": "Adam Petersen",
+    "Message": "-",
+    "LocAdded": 1,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "src/code_maat/parsers/git2.clj",
+    "Rev": "990442e",
+    "Date": "2013-08-29",
+    "Author": "Adam Petersen",
+    "Message": "-",
+    "LocAdded": 2,
+    "LocDeleted": 4,
+    "Binary": false,
+    "HasLoc": true
+  }
+]

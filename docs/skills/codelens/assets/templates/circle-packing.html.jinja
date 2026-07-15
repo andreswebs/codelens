@@ -1,0 +1,139 @@
+<!doctype html>
+<!-- Template: filled by the codelens skill scripts via literal {{TOKEN}} string
+     substitution. Kept a valid Jinja subset (no filters or blocks); if ever
+     rendered with a Jinja engine, disable autoescape or mark {{D3}}/{{DATA}}
+     safe, since both must emit raw HTML/JS. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crime-scene hotspot map</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        background: #0b0d12;
+        color: #e6e8ec;
+      }
+      header {
+        padding: 8px 12px;
+        font-weight: 600;
+      }
+      #chart {
+        flex: 1;
+        display: grid;
+        place-items: center;
+      }
+      .tip {
+        position: fixed;
+        pointer-events: none;
+        opacity: 0;
+        background: #1b1f27;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 12px;
+        max-width: 320px;
+        transition: opacity 0.1s;
+      }
+      circle {
+        cursor: pointer;
+      }
+      .label {
+        pointer-events: none;
+        text-anchor: middle;
+        fill: #fff;
+        paint-order: stroke;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      Hotspot map
+      <span style="opacity: 0.6"
+        >- circle size = lines of code, color = change frequency; click to
+        zoom</span
+      >
+    </header>
+    <div id="chart"></div>
+    <div class="tip" id="tip"></div>
+    {{D3}}
+    <script>
+      const data = {{DATA}};
+
+      const width = 900, height = 900;
+      const color = d3.scaleSequential([0, 1], d3.interpolateYlOrRd);
+
+      const pack = d3.pack().size([width, height]).padding(3);
+      const root = pack(d3.hierarchy(data).sum(d => d.size || 0).sort((a, b) => b.value - a.value));
+
+      const svg = d3.select("#chart").append("svg")
+        .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
+        .attr("width", width).attr("height", height)
+        .style("max-width", "100%").style("height", "auto").style("cursor", "pointer");
+
+      const tip = d3.select("#tip");
+      let focus = root, view;
+
+      const node = svg.append("g").selectAll("circle")
+        .data(root.descendants().slice(1))
+        .join("circle")
+          .attr("fill", d => d.children ? "#2a2f3a" : color(d.data.weight ?? 0))
+          .attr("stroke", d => d.children ? "#3a4150" : "none")
+          .attr("pointer-events", d => !d.children ? "all" : null)
+          .on("mouseover", (e, d) => {
+            tip.style("opacity", 1).html(
+              `<b>${d.data.name}</b><br>${d.value.toLocaleString()} LOC` +
+              (d.data.weight != null ? `<br>heat ${(d.data.weight * 100).toFixed(0)}%` : "") +
+              (d.data.category != null ? `<br>${d.data.category}` : ""));
+          })
+          .on("mousemove", (e) => tip.style("left", (e.clientX + 12) + "px").style("top", (e.clientY + 12) + "px"))
+          .on("mouseout", () => tip.style("opacity", 0))
+          .on("click", (e, d) => { if (focus !== d) { zoom(e, d); e.stopPropagation(); } });
+
+      const label = svg.append("g").style("font", "11px system-ui").selectAll("text")
+        .data(root.descendants())
+        .join("text")
+          .attr("class", "label")
+          .style("fill-opacity", d => d.parent === root ? 1 : 0)
+          .style("display", d => d.parent === root ? "inline" : "none")
+          .text(d => d.data.name);
+
+      svg.on("click", (e) => zoom(e, root));
+      zoomTo([root.x, root.y, root.r * 2]);
+
+      function zoomTo(v) {
+        const k = width / v[2];
+        view = v;
+        label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        node.attr("r", d => d.r * k);
+      }
+
+      function zoom(event, d) {
+        focus = d;
+        const t = svg.transition().duration(event.altKey ? 2000 : 600)
+          .tween("zoom", () => {
+            const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
+            return t => zoomTo(i(t));
+          });
+        label.filter(function (d) { return d.parent === focus || this.style.display === "inline"; })
+          .transition(t)
+            .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+            .on("start", function (d) { if (d.parent === focus) this.style.display = "inline"; })
+            .on("end", function (d) { if (d.parent !== focus) this.style.display = "none"; });
+      }
+    </script>
+  </body>
+</html>

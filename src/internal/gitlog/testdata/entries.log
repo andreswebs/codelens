@@ -1,0 +1,9 @@
+--b777738--2015-01-01--Alice--Initial import
+1	0	a.go
+3	2	b.go
+
+--a527b79--2015-01-02--Bob--Wire up modules
+1	0	c.go
+1	0	d.go
+1	0	e.go
+1	0	f.go

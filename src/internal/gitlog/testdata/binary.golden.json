@@ -1,0 +1,24 @@
+[
+  {
+    "Entity": "src/code_maat/parsers/git2.clj",
+    "Rev": "586b4eb",
+    "Date": "2015-06-15",
+    "Author": "Adam Tornhill",
+    "Message": "Fix the parser",
+    "LocAdded": 35,
+    "LocDeleted": 0,
+    "Binary": false,
+    "HasLoc": true
+  },
+  {
+    "Entity": "docs/logo.png",
+    "Rev": "586b4eb",
+    "Date": "2015-06-15",
+    "Author": "Adam Tornhill",
+    "Message": "Fix the parser",
+    "LocAdded": 0,
+    "LocDeleted": 0,
+    "Binary": true,
+    "HasLoc": true
+  }
+]

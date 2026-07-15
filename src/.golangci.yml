@@ -1,0 +1,17 @@
+# golangci-lint v2 configuration - the lint stage of the quality gate. Keep this
+# green: `make validate` runs it and every change must pass.
+#
+# Error-handling convention: never use `_ =` to silence an error you ought to
+# handle. errcheck keeps every unchecked error visible - handle it (return, log,
+# or assert in a test). The only sanctioned ignores are the idioms errcheck
+# already permits via an explicit blank assignment (e.g. a deferred Close).
+version: "2"
+
+linters:
+  # `standard` enables errcheck, govet, ineffassign, staticcheck, and unused -
+  # bug and unchecked-error coverage. We add revive for style/convention checks
+  # (exported-symbol docs, naming, error-string form). Deliberately not "all":
+  # the extra linters trade signal for noise.
+  default: standard
+  enable:
+    - revive

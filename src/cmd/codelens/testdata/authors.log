@@ -1,0 +1,13 @@
+--51e5087--2013-10-31--Adam Petersen--First commit
+15	0	src/code_maat/parsers/git.clj
+
+--f5c6d3a--2013-11-01--Adam Petersen--Add git2 parser
+25	2	src/code_maat/parsers/git2.clj
+6	1	src/code_maat/parsers/git.clj
+
+--3fb4c9e--2013-11-02--Carl Petersen--Wire up analysis
+17	0	src/code_maat/analysis/authors.clj
+-	-	doc/architecture.png
+
+--8a2e10d--2013-11-03--Adam Tornhill--Refactor parser
+3	3	src/code_maat/parsers/git2.clj

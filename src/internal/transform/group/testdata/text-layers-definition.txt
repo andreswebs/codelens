@@ -1,0 +1,2 @@
+src/Features/Core => Core
+src/Features => Features

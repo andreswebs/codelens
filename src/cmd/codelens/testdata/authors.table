@@ -1,0 +1,5 @@
+entity                              n_authors  n_revs
+src/code_maat/parsers/git2.clj      2          2
+src/code_maat/parsers/git.clj       1          2
+doc/architecture.png                1          1
+src/code_maat/analysis/authors.clj  1          1
