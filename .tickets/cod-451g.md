@@ -16,7 +16,7 @@ exit codes from one `Descriptor`. The three meta commands (`schema`, `version`,
 `print-log-command`) do not: each is built by a bespoke builder func, and
 `metaSummaries()` re-declares Name/Summary/ExitCodes for the command list. Name is
 declared twice and the exit codes live disconnected from the command. Worse, meta
-commands are **not introspectable** — `schema --command print-log-command` is a usage
+commands are **not introspectable** - `schema --command print-log-command` is a usage
 error, so an agent cannot discover `--after` / `--command` at runtime, contradicting
 the "runtime schema is the source of truth" ethos (cli-design.md 8).
 

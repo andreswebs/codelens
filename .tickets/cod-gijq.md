@@ -2,7 +2,7 @@
 id: cod-gijq
 status: closed
 deps: []
-links: [cod-l1az, cod-a1gr]
+links: [cod-l1az, cod-a1gr, cod-258k]
 created: 2026-07-15T10:01:20Z
 type: feature
 priority: 1
@@ -67,13 +67,13 @@ optional), `--categorical`, `--invert`, `--path-prefix`, `-o`.
   `--invert`, so low age = hot); `--categorical` -> per-owner `tab20` (reuse the
   `color_of` pattern from `fractal.py`).
 - **Node-set rule:** follow the unified structure-first rule from the linked ticket
-  `cod-l1az` — with `--structure`, the tokei files are the node set for every mode
+  `cod-l1az` - with `--structure`, the tokei files are the node set for every mode
   (a file absent from the weights renders neutral: cold for numeric, a reserved
   sentinel category for categorical); without `--structure`, the weights are the
   node set. Keep this identical to `enclosure.py` post-`cod-l1az` so the static and
   interactive maps agree.
 - Honor the same include/exclude globs as `cod-a1gr` (linked) so an authored-only
-  report matches the authored-only interactive maps — or accept already-filtered
+  report matches the authored-only interactive maps - or accept already-filtered
   inputs; state which in the completion note.
 - Emit SVG (canonical) or PNG by extension; trailing `wrote {out} (N files)`.
 
@@ -95,7 +95,7 @@ e.g. 30), `-o`.
 
 ## TDD plan (/tdd)
 
-Drive each script with fixture JSON; assert on observable output — the intermediate
+Drive each script with fixture JSON; assert on observable output - the intermediate
 hierarchy (add a `--json-out` to `treemap.py` mirroring `enclosure.py`), the
 `wrote ... (...)` counts, exit codes, and that the output file exists and is
 non-empty SVG. Do NOT assert matplotlib internals. Vertical slices, one test then
@@ -149,7 +149,7 @@ runnable via `uv run` with PEP 723 inline metadata).
   `fractal.py` (squarify + `tab20` colour pattern), `churn.py`/`commit_cloud.py`
   (lane conventions)
 - `docs/skills/codelens/references/catalog.md`, `references/embedding.md`
-- Linked: `cod-l1az` (enclosure node-set unification — mirror it), `cod-a1gr`
+- Linked: `cod-l1az` (enclosure node-set unification - mirror it), `cod-a1gr`
   (include/exclude globs). Consumed by the markdown report assembler ticket.
 - Skills: `/tdd` (fixture-driven, vertical slices), `/llm-coding` (no speculative
   flags beyond what the report needs)

@@ -49,7 +49,7 @@ TEAM_NOTE = (
     "_Aggregate authors to teams (`--team-map`) before reading this as a Conway "
     "signal; an inter-team tie is a potential coordination bottleneck, not proof._"
 )
-HEURISTIC_NOTE = "_Heuristic only — a conversation starter, not a hard finding._"
+HEURISTIC_NOTE = "_Heuristic only - a conversation starter, not a hard finding._"
 
 PLACEHOLDER = "_No finding provided for this section._"
 
@@ -58,15 +58,15 @@ PLACEHOLDER = "_No finding provided for this section._"
 # guardrails the script injects unconditionally.
 SECTIONS: list[dict[str, Any]] = [
     {"key": "executive_summary", "title": "Executive summary", "fig": "summary"},
-    {"key": "hotspots", "title": "Hotspots — where the risk is", "fig": "hotspots"},
+    {"key": "hotspots", "title": "Hotspots - where the risk is", "fig": "hotspots"},
     {
         "key": "complexity_trend",
-        "title": "Complexity trend — is it getting worse?",
+        "title": "Complexity trend - is it getting worse?",
         "fig": "complexity",
     },
     {
         "key": "coupling",
-        "title": "Change coupling — why changes ripple",
+        "title": "Change coupling - why changes ripple",
         "fig": "coupling",
     },
     {
@@ -83,8 +83,8 @@ SECTIONS: list[dict[str, Any]] = [
         "social": True,
         "team_note": True,
     },
-    {"key": "code_age", "title": "Code age — stabilization", "fig": "age"},
-    {"key": "churn", "title": "Churn — the macro trend", "fig": "churn"},
+    {"key": "code_age", "title": "Code age - stabilization", "fig": "age"},
+    {"key": "churn", "title": "Churn - the macro trend", "fig": "churn"},
     {
         "key": "word_cloud",
         "title": "Commit vocabulary",
@@ -101,15 +101,21 @@ def die(msg: str, code: int) -> NoReturn:
 
 
 def parse_findings(text: str) -> dict[str, str]:
-    """Parse the findings markdown into `key -> body`. A `# H1` line is the report
-    title (key 'title'); each `## key` line starts a section whose body is the text
-    up to the next `## ` or EOF. Keys are normalized (lowercased, spaces/hyphens ->
-    underscores) to the reserved vocabulary in references/reporting.md."""
+    """Parse the findings markdown into `key -> body`. The `# H1` line is the sole
+    report title (key 'title'); a `## title` block is ignored so the title can never
+    be overridden or blanked. Each other `## key` line starts a section whose body is
+    the text up to the next `## ` or EOF. Keys are normalized (lowercased,
+    spaces/hyphens -> underscores) to the reserved vocabulary in references/reporting.md."""
     out: dict[str, list[str]] = {}
     current: str | None = None
     for line in text.splitlines():
         if line.startswith("## "):
-            current = line[3:].strip().lower().replace("-", "_").replace(" ", "_")
+            key = line[3:].strip().lower().replace("-", "_").replace(" ", "_")
+            if key == "title":
+                # The title comes only from the `# H1` line; drop a `## title` block.
+                current = None
+                continue
+            current = key
             out.setdefault(current, [])
         elif line.startswith("# ") and current is None:
             out.setdefault("title", []).append(line[2:].strip())

@@ -13,8 +13,8 @@ tags: [codelens, architecture, deepening]
 
 Architecture-review candidate 2. `internal/output/registry.go` is a shallow module
 whose interface (8 exported funcs + a documented concurrency contract) exceeds its
-map-get/set implementation, and whose stated purpose — letting `schema` reflect a
-command's envelope shape and exit-code set without importing the command packages — is
+map-get/set implementation, and whose stated purpose - letting `schema` reflect a
+command's envelope shape and exit-code set without importing the command packages - is
 never realized. Every reader is a test. Delete it; `schema` already surfaces
 `exit_codes` from the descriptors.
 
@@ -26,21 +26,21 @@ Skills: /tdd (retarget the conformance guard test-first), /golang (idioms),
 ### Evidence (verified)
 
 - **Envelope half** (`RegisterEnvelope`/`EnvelopeFor`/`AllEnvelopes`): zero production
-  callers — not even a writer. Fully dead.
+  callers - not even a writer. Fully dead.
 - **Exit-code half** (`RegisterExitCodes`/`ExitCodesFor`/`AllExitCodes`): the only
   production writer is `cmd/codelens/exitcodes.go` (`init` -> `registerExitCodes`). No
-  production reader — `ExitCodesFor`/`AllExitCodes` are read only in tests.
+  production reader - `ExitCodesFor`/`AllExitCodes` are read only in tests.
 - `schema` emits `exit_codes` straight from the descriptors: `analysis.Schema(d)` and
   `analysis.List(analysis.All(), metaSummaries())` (`internal/analysis/schema.go`), not
   from this registry. The registry is redundant.
-- Deletion test: removing the registry concentrates no complexity — nothing crosses
+- Deletion test: removing the registry concentrates no complexity - nothing crosses
   the seam in production. One adapter (the test), so no real seam.
 
 ### Delete
 
 ```text
 internal/output/registry.go          (both maps, mutex, deep-copy helpers)
-internal/output/registry_test.go     (Roundtrip / IsCopy / DeepCopy — tests the
+internal/output/registry_test.go     (Roundtrip / IsCopy / DeepCopy - tests the
                                        registry's own mechanics only)
 cmd/codelens/exitcodes.go            (init + registerExitCodes; sole registry writer)
 ```
@@ -56,9 +56,9 @@ unrelated to the registry).
   descriptor declares a non-empty exit-code set including `0` and a non-empty
   error-code set; (2) the output registry echoes the exit-code set; (3) `schema`
   surfaces exactly those codes. **Only (2) depends on the registry, and it exists only
-  to prove the init wiring ran — the wiring we are deleting.** Drop (2); keep (1) and
+  to prove the init wiring ran - the wiring we are deleting.** Drop (2); keep (1) and
   (3), which are the load-bearing invariants and are registry-independent.
-- `TestSchema_ReportsDeclaredErrorCodes` reads `schema` output only — already
+- `TestSchema_ReportsDeclaredErrorCodes` reads `schema` output only - already
   registry-independent. Keep unchanged.
 
 Retargeted `TestExitCodesRegistered_AllCommands`:
@@ -67,12 +67,12 @@ Retargeted `TestExitCodesRegistered_AllCommands`:
   `d.ErrorCodes` non-empty; `schemaOf(d.Name).ExitCodes == d.ExitCodes` and
   `.ErrorCodes == d.ErrorCodes`. (Remove the `output.ExitCodesFor` block.)
 - Per meta command (`metaSummaries()`): they do not resolve through
-  `analysis.Lookup`, so `schema --command <meta>` is a usage error — verify via the
+  `analysis.Lookup`, so `schema --command <meta>` is a usage error - verify via the
   full command list instead. Decode `codelens schema` (no `--command`) into the
   existing `schemaList` type (`schema_test.go`), find each meta command by `Name`, and
   assert its `ExitCodes` equal the `metaSummaries()` entry. This keeps the guarantee
   that `metaSummaries` flows into the schema list.
-- The `output` import in the test file becomes unused — remove it.
+- The `output` import in the test file becomes unused - remove it.
 
 Rename the file to `schemacodes_test.go` (its subject is now the schema-surfaced
 codes, and `exitcodes.go` no longer exists). `schemaOf`/`schemaCmd`/`schemaList` and
@@ -84,7 +84,7 @@ codes, and `exitcodes.go` no longer exists). `schemaOf`/`schemaCmd`/`schemaList`
    (per-analysis and meta-via-list) before removing the registry; it must still pass
    against the current tree except the removed `output.ExitCodesFor` assertions.
 2. Delete `output/registry.go`, `output/registry_test.go`, `cmd/codelens/exitcodes.go`.
-3. Green: `make build` — the compiler flags any leftover reference (there are none in
+3. Green: `make build` - the compiler flags any leftover reference (there are none in
    production; only the test import to remove).
 
 ### Parity / behavior

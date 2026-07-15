@@ -273,7 +273,7 @@ P0 (foundations)
                     ├─> P2 (vertical slice: needs P0 output + P1 parser)
 P0 ────────────────┘
 P2 ─> P3 (transforms use pipeline + authors slice)
-P2 ─> P4-0 helpers ─> P4 batches A–E (each batch independent; parallelizable)
+P2 ─> P4-0 helpers ─> P4 batches A-E (each batch independent; parallelizable)
 P4 ─> P5 (surface finish)
 P4/P5 ─> P6 (docs reflect final surface)
 ```

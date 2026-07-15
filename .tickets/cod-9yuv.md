@@ -34,14 +34,14 @@ The book is a layered method; later stages build on earlier ones. Use this order
 the reference's backbone (it is also the report sequence in the sibling reporting
 ticket):
 
-- **Stage 0 scope** — `summary`; one year is a good default window.
-- **Stage 1 WHERE** — hotspots = geographical profiling to a prioritized list of code
+- **Stage 0 scope** - `summary`; one year is a good default window.
+- **Stage 1 WHERE** - hotspots = geographical profiling to a prioritized list of code
   to improve. The offender is problematic code.
-- **Stage 2 WORSENING?** — complexity trend; prefer trends over absolute values.
-- **Stage 3 WHY IT RIPPLES** — change coupling; "hotspots rarely walk alone";
+- **Stage 2 WORSENING?** - complexity trend; prefer trends over absolute values.
+- **Stage 3 WHY IT RIPPLES** - change coupling; "hotspots rarely walk alone";
   sum-of-coupling = architecturally significant modules; group by folder and look for
   coupling that crosses architectural boundaries.
-- **Stage 4 WHO** — the social/organizational analyses; software is made of people.
+- **Stage 4 WHO** - the social/organizational analyses; software is made of people.
 
 Anchor the reference on these leading words so they accrue meaning in one place:
 offender profile, geographical profiling, hotspot as home base, power law,
@@ -53,56 +53,56 @@ Red/Yellow/Green.
 Each block co-locates definition, how to read it, how to phrase the finding, and
 caveats.
 
-- **Hotspot map** — size = LOC (complexity proxy), colour = change frequency;
+- **Hotspot map** - size = LOC (complexity proxy), colour = change frequency;
   **colour/change is the lead signal, size is the secondary severity multiplier**. A
   large pale circle is complex-but-stable (lower priority). Generated/vendored files
   are textbook false positives; scope them out before naming the top hotspot. The
   real offender is the most-changed hand-maintained file; then run a complexity trend
   on it.
-- **Complexity trend** — indentation as complexity proxy; the SHAPE matters more than
+- **Complexity trend** - indentation as complexity proxy; the SHAPE matters more than
   the number. Three shapes only: deteriorating (act/refactor), refactored (a dip =
-  good, keep monitoring), stable (ok). No "growing" shape — a rising line is
+  good, keep monitoring), stable (ok). No "growing" shape - a rising line is
   disambiguated by overlaying LOC (rises with LOC = growth by addition, less
   alarming; complexity climbs faster than LOC = true deterioration).
-- **Change-coupling graph** — edges = files/components that co-change (degree = %
+- **Change-coupling graph** - edges = files/components that co-change (degree = %
   shared commits; node weight = sum-of-coupling = architectural centrality). Coupling
   *within* a boundary is expected; coupling that is *surprising and crosses an
   architectural boundary* signals decay. Highest degree is NOT the signal (test and
   implementation, or sibling forks, sit near 100% and are benign). Causes -> actions:
   copy-paste (extract), unsupportive boundary (co-locate), producer-consumer (often
-  legitimate — domain judgment). Prioritise volatile couplings overlapping hotspots.
+  legitimate - domain judgment). Prioritise volatile couplings overlapping hotspots.
   The tool names suspects; a human reads the code to confirm.
-- **Knowledge / ownership map** — one colour per developer; single-colour component =
-  key-person dependency, mixed = shared effort. Mixed is not automatically good — the
+- **Knowledge / ownership map** - one colour per developer; single-colour component =
+  key-person dependency, mixed = shared effort. Mixed is not automatically good - the
   *degree* of the main developer's ownership is the load-bearing signal, and
   key-person risk is amplified by low code quality. Phrase findings as "who to talk
   to + the fallback", never as a productivity ranking.
-- **Code-age map** — reframed via the *stabilization* principle: stable cores are a
+- **Code-age map** - reframed via the *stabilization* principle: stable cores are a
   virtue; *old code that still churns* is the smell (a low-cohesion signal, many
   reasons to change). Use NO age threshold or "frozen" language; the 2nd edition
   defines no code-age analysis or age metric, so the reading rests on stabilization,
   not a measured age rule.
-- **Communication / Conway network** — the Conway litmus test. MUST aggregate
+- **Communication / Conway network** - the Conway litmus test. MUST aggregate
   individuals -> teams before the reading is valid. Most paths should be intra-team;
   inter-team paths are *potential* coordination bottlenecks (an occasional one is a
   healthy helpful-colleague signal). The usual fix is technical (cohesion), not
   reorganisation. Aliases must be resolved first.
-- **Fractal / fragmentation** — three ownership patterns: single developer
+- **Fractal / fragmentation** - three ownership patterns: single developer
   (consistent but key-person risk); balanced (higher main-dev ownership predicts
   fewer defects); many minor contributors (defect risk). The *count of minor
-  contributors* is the STRONGER defect predictor — lead with it when both are present.
-- **Churn trend** — project-level added-vs-deleted over time; the macro backdrop for
+  contributors* is the STRONGER defect predictor - lead with it when both are present.
+- **Churn trend** - project-level added-vs-deleted over time; the macro backdrop for
   the business/"unplanned work" argument. Trends make waste obvious.
-- **Commit word cloud** — heuristic only, a conversation-starter, never a hard
+- **Commit word cloud** - heuristic only, a conversation-starter, never a hard
   finding. Domain terms = healthy; bug/crash/revert/bump = drill deeper.
-- **Summary tiles** — scope / situational-awareness framing.
+- **Summary tiles** - scope / situational-awareness framing.
 
 ### 3. Heuristics table (single source of truth for every number)
 
 Put ALL numeric rules of thumb here, once, phrased as heuristics (not laws):
 
 - Hotspots are typically **1-5% of code but hold 25-75% of defects** (one cited
-  system: 4% of code, 72% of defects — the high end).
+  system: 4% of code, 72% of defects - the high end).
 - A change-based defect model predicts **>75% of defects** (beats pure complexity).
 - Analysis window: **one year default**; drop toward one month for very high-churn
   repos; too much history flags cooled-down hotspots.
@@ -126,8 +126,8 @@ Put ALL numeric rules of thumb here, once, phrased as heuristics (not laws):
 - **Resolve author aliases first** (`.mailmap` / `--team-map`); exclude bulk-import
   commits that distort ownership.
 - **Aggregate people to teams/components** for the Conway reading.
-- **Don't shoot the messenger** — the loudest symptom is rarely the root cause.
-- **Everything is probabilistic** — hedge with risk language, not certainty.
+- **Don't shoot the messenger** - the loudest symptom is rarely the root cause.
+- **Everything is probabilistic** - hedge with risk language, not certainty.
 - **Data doesn't replace talking to the team.**
 
 ### 5. Communicating findings (report framing; brief, points to the reporting ticket)
@@ -188,4 +188,4 @@ code-age wording consistent; land whichever is ready first and reconcile the oth
 
 **2026-07-15T10:11:45Z**
 
-Implemented. New references/interpretation.md is the single reading authority: investigative funnel + leading words, a reading block per visualization, one heuristics table (all numbers, no per-line attribution), the social misuse guardrails, and a communicating-findings section. SKILL.md step 5 rewired to point at it. catalog.md: added a top-of-file pointer (covers every card) and refined the Read: hooks the book corrects — hotspot (colour/change leads over size), coupling (surprising cross-boundary, not raw degree; node weight = SOC), knowledge (main-dev ownership degree is the signal), code-age (stabilization reframe, dropped the 'frozen' rule), communication (aggregate to teams first), fractal (minor-contributor count is the stronger predictor), complexity (LOC overlay), word cloud (heuristic only). cod-3wut already closed (its full-history code-age caveat is present and consistent). Numbers live only in the heuristics table. markdownlint clean; skill_ref validate passes.
+Implemented. New references/interpretation.md is the single reading authority: investigative funnel + leading words, a reading block per visualization, one heuristics table (all numbers, no per-line attribution), the social misuse guardrails, and a communicating-findings section. SKILL.md step 5 rewired to point at it. catalog.md: added a top-of-file pointer (covers every card) and refined the Read: hooks the book corrects - hotspot (colour/change leads over size), coupling (surprising cross-boundary, not raw degree; node weight = SOC), knowledge (main-dev ownership degree is the signal), code-age (stabilization reframe, dropped the 'frozen' rule), communication (aggregate to teams first), fractal (minor-contributor count is the stronger predictor), complexity (LOC overlay), word cloud (heuristic only). cod-3wut already closed (its full-history code-age caveat is present and consistent). Numbers live only in the heuristics table. markdownlint clean; skill_ref validate passes.

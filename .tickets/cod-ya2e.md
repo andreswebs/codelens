@@ -14,11 +14,11 @@ tags: [codelens, architecture, deepening]
 Architecture-review candidate 3, reframed after candidate 1 (which already removed the
 envelope boilerplate). The remaining duplication splits by kind:
 
-- **Real logic duplication** — `maindev` and `refmaindev` run an identical
+- **Real logic duplication** - `maindev` and `refmaindev` run an identical
   max-contributor reduce differing only by `.Added` vs `.Deleted`; `maindevbyrevs` runs
   the same reduce over `effort.ByEntity`. The tie-break + total rule is copied three
   times; a fix in one must be mirrored.
-- **Structural-only similarity** — the churn trio (`abschurn`/`authorchurn`/
+- **Structural-only similarity** - the churn trio (`abschurn`/`authorchurn`/
   `entitychurn`) is `SumByGroup` + field-copy + sort; the flatten pair (`ownership`/
   `entityeffort`) is a nested entity x author loop. No shared logic, just shape.
 
@@ -89,7 +89,7 @@ top = item }` (strict `>`, keeps first on tie).
 (ownership over `churn.ByEntityAuthorContrib`, entityeffort over `effort.ByEntity`).
 Sorts stay.
 
-> Honest note: the churn-trio and flatten-pair changes concentrate no logic — they
+> Honest note: the churn-trio and flatten-pair changes concentrate no logic - they
 > trade an explicit `for` loop for a closure. Included because both clusters were in
 > scope; if a loop reads clearer than `Map`/`FlatMap` in review, keep the loop for that
 > file. `MaxBy` is the load-bearing extraction and should land regardless.
@@ -102,7 +102,7 @@ Sorts stay.
    - `Map`/`FlatMap`: order preserved; empty input -> empty (non-nil where the loop
      produced `make([]R, 0, ...)`); nested `FlatMap(Map(...))` shape.
 2. Refactor each analysis Run to use the helpers. The existing per-analysis tests and
-   CLI golden tests are the parity guard — they must stay green with **no expectation
+   CLI golden tests are the parity guard - they must stay green with **no expectation
    changes** (pure internal refactor, byte-identical output).
 3. `make build` green.
 

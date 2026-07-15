@@ -72,7 +72,7 @@ Run func(mods []model.Modification, opts Opts) (any, error)
 - Remove the now-unused `internal/output` import if nothing else in the file uses it.
   (`Column`/`Flag`/`Opts` are local to this package.)
 
-### 2. `internal/output` — new `NewResult` constructor
+### 2. `internal/output` - new `NewResult` constructor
 
 Add (new file `newresult.go`, or in `types.go`):
 
@@ -96,9 +96,9 @@ func NewResult(analysis string, rows any) Result {
   reflect.Slice`, else 0) and **reuse it in `truncate`** (`cmd/codelens/commands.go`
   already reflects for the same purpose) to keep a single reflection site.
   Move it to the output package so both callers share it, or keep truncate's local and
-  add one here — pick the one-place option (llm-coding: no duplicated reflection).
+  add one here - pick the one-place option (llm-coding: no duplicated reflection).
 
-### 3. `cmd/codelens` — effectiveParams + actionFor
+### 3. `cmd/codelens` - effectiveParams + actionFor
 
 `effectiveParams(cmd *cli.Command, d analysis.Descriptor) map[string]any`:
 
@@ -107,7 +107,7 @@ func NewResult(analysis string, rows any) Result {
 - Include **every declared flag with its effective value** (default or overridden) so
   the result documents the thresholds actually applied.
 - Return `nil` when `len(d.Flags) == 0`, so flagless analyses keep `Params` nil (and
-  `omitempty` omits it — output stays byte-identical for them).
+  `omitempty` omits it - output stays byte-identical for them).
 - Mirror the declared-flag pattern already in `analysisOpts`.
 
 `actionFor` (`commands.go`): build the envelope after Run.

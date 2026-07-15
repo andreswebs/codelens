@@ -96,18 +96,20 @@ guardrails the social analyses must respect (never rank individuals; aggregate t
 teams; findings are probabilistic). A visualization delivered without this reading
 is incomplete.
 
-**Done when:** the finding is named, in the terms `interpretation.md` gives — not
+**Done when:** the finding is named, in the terms `interpretation.md` gives - not
 just the chart handed over.
 
 ### 6. Compose the report (optional)
 
 When the deliverable is a sequenced findings report rather than a single chart,
-assemble one self-contained markdown document with `scripts/report.py`: render the
-degraded static figures (`treemap.py`, `pair_matrix.py`, and the static charts) into
-one directory, write a findings file (your reading of each analysis, per
-[interpretation.md](references/interpretation.md)), and run the assembler. It pins
-the investigative sequence, embeds the figures inline as SVG, and always emits the
-social-analysis guardrails. See [reporting.md](references/reporting.md).
+assemble one self-contained markdown document with `scripts/report.py`. Run
+`scripts/run.bash --repo PATH --out out/` to produce the analyses, the degraded
+static figures (`treemap.py`, `pair_matrix.py`, and the static charts), and a
+grounding `digest.md` in one command; write a findings file (your reading of each
+analysis, per [interpretation.md](references/interpretation.md), grounded in the
+digest); and run the assembler. It pins the investigative sequence, embeds the
+figures inline as SVG, and always emits the social-analysis guardrails. See
+[reporting.md](references/reporting.md).
 
 **Done when:** `report.py` exits `0` and `report.md` carries every section with its
 findings and figures.

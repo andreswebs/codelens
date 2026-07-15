@@ -5,8 +5,8 @@ One card per visualization: what it **consumes**, the **command** to build it, t
 after routing. Column names are codelens JSON (snake_case), verified against build
 eaece4f; re-check with `codelens schema --command <analysis>` after codelens changes.
 
-Each card's **Read:** line is a hook; the full reading — the investigative funnel,
-the heuristics table, the misuse guardrails, and how to phrase the finding — is in
+Each card's **Read:** line is a hook; the full reading - the investigative funnel,
+the heuristics table, the misuse guardrails, and how to phrase the finding - is in
 [interpretation.md](interpretation.md).
 
 ---
@@ -19,7 +19,7 @@ the heuristics table, the misuse guardrails, and how to phrase the finding — i
 - **Static:** `uv run scripts/treemap.py --weights revs.json --structure tokei.json -o hotspots.svg` (embeddable SVG/PNG; same flags and structure-first node set as `enclosure.py`).
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** the **offender profile** is big + hot, but colour (change) is the lead
-  signal and size (LOC) the severity multiplier — a large pale circle is
+  signal and size (LOC) the severity multiplier - a large pale circle is
   complex-but-stable. Scope out generated files first (false positives). Heuristics
   and full reading: [interpretation.md](interpretation.md). Contract:
   [enclosure.md](enclosure.md).
@@ -76,8 +76,8 @@ the heuristics table, the misuse guardrails, and how to phrase the finding — i
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** edges co-change (degree = % shared commits; node weight =
   sum-of-coupling = architectural centrality). The signal is **surprising** coupling
-  that crosses an architectural boundary (group with `--group`), not raw high degree
-  — a test and its implementation sit near 100% and are benign. Causes: copy-paste
+  that crosses an architectural boundary (group with `--group`), not raw high degree -
+  a test and its implementation sit near 100% and are benign. Causes: copy-paste
   (extract), unsupportive module boundaries (co-locate), producer-consumer (often
   legitimate). Reading: [interpretation.md](interpretation.md).
 - **Empty result:** grouping to components dilutes per-pair degrees, so the
@@ -97,7 +97,7 @@ the heuristics table, the misuse guardrails, and how to phrase the finding — i
 - **Command:** `uv run scripts/dev_network.py --communication comm.json -o network.html`
 - **Static:** `uv run scripts/pair_matrix.py --pairs comm.json --a-col author --b-col peer --weight-col strength --note 'coordination risk, not a performance ranking' -o network.svg`.
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
-- **Read:** Conway litmus test — aggregate authors to teams first (`--team-map`).
+- **Read:** Conway litmus test - aggregate authors to teams first (`--team-map`).
   Mostly intra-team links = healthy; inter-team links are *potential* coordination
   bottlenecks (the usual fix is cohesion, not reorg). Reading:
   [interpretation.md](interpretation.md).
@@ -118,7 +118,7 @@ total_revs`; `fragmentation` for the scalar.
 - **Command:** `uv run scripts/fractal.py --effort effort.json -o fractal.svg`
 - **Formats:** SVG or PNG (the -o extension picks the format).
 - **Read:** three ownership patterns: single developer, balanced (higher main-dev
-  ownership predicts fewer defects), many minor contributors (defect risk — the
+  ownership predicts fewer defects), many minor contributors (defect risk - the
   *count* of minor contributors is the stronger predictor). Reading:
   [interpretation.md](interpretation.md).
 

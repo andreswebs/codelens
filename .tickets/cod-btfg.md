@@ -81,7 +81,7 @@ In `runCoupling` (`src/internal/analysis/coupling.go`):
   (`len(pairs) > 0`); an empty log / no pairs is a different (existing) condition
   and should not produce this warning.
 
-Add `coupling_all_filtered` to the coupling descriptor... — note diagnostics are
+Add `coupling_all_filtered` to the coupling descriptor... - note diagnostics are
 warnings, not errors, so they do **not** belong in `ErrorCodes`/`ExitCodes` (those
 are for exit-affecting outcomes). Do not add it there; document the warning code in
 the coupling card instead.

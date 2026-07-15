@@ -153,11 +153,33 @@ Exclude only truly generated artifacts. Config (`appsettings*.json`, `*.yml`) an
 localization sources (`*.arb`, `*.resx`) are human-authored and should not be
 excluded by default.
 
+The same `--exclude` set must reach **every entity-centric analysis**, not only
+the hotspot and coupling maps. `revisions`, `coupling`, `sum-of-coupling`,
+`main-developer`, `code-age`, `absolute-churn`, `entity-effort`, and
+`fragmentation` are all distorted when a generated file is regenerated. In one
+fleet repo a single +852k-line commit that regenerated a `juris-rules` JSON blob
+(top commit word `regenerate`) dominated `absolute-churn` and skewed effort,
+fragmentation, and ownership until that path was excluded. Do **not** pass the
+excludes to `communication` (an author graph) or `summary` (whole-repo counts), so
+authorship and totals stay whole. `scripts/run.bash` is the canonical
+implementation: it applies its built-in exclude set to exactly those
+entity-centric analyses and leaves `communication` and `summary` unfiltered.
+
 ## Analysis period
 
 Scope the git log by date (`--after=` on the log command). Heuristics: one year is
 a good default; a month for very high-churn repos; a window around a major event
 (reorg, redesign) to measure its impact. Too much history buries recent trends.
+
+A trailing window assumes activity clusters near the present. A stale or
+front-loaded repo, with an early burst and a late trickle of commits, gets a
+nearly empty window: in one fleet a repo had 17 in-window commits out of 12,252.
+For a stale or inactive repo, analyze **full history** instead, since there is no
+recency tension when nothing recent is happening. `scripts/run.bash --full-history`
+does this and warns when the windowed log is empty. Auto-widening the window when
+in-window commits fall below a threshold was considered and declined: it silently
+changes the analysis window from a heuristic, making two runs of the same command
+incomparable. An explicit lever plus the empty-window warning is preferred.
 
 The one exception is `code-age`: run it against full history, not a window scoped
 with `--after`. Age is measured from the log's earliest commit, so a scoped window
@@ -183,3 +205,8 @@ stderr, distinguished from errors by `level: "warning"` (and no `ok` field):
 `{schema_version, level: "warning", code, message, hint?, details?}`. One per
 line (valid NDJSON), they never change the exit code and never touch stdout, so a
 consumer reading results from stdout is unaffected.
+
+The skill's Python render scripts follow the same convention: they print their
+`wrote ...` summary (and uv's `Installed N packages`) to stderr on success, so a
+wrapper must judge them by exit code, never by stderr being empty. See
+[reporting.md](reporting.md).

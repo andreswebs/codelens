@@ -149,6 +149,25 @@ class TestSummaryTiles(ReportCase):
         self.assertIn("| authors | 34 |", md)
 
 
+class TestTitle(ReportCase):
+    def test_h1_is_sole_title_and_title_block_ignored(self) -> None:
+        # A `## title` block must not override or blank the `# H1` title.
+        findings = "# Real Title\n## title\nBogus Override\n## hotspots\nX is hot.\n"
+        rc, stderr, md = self.run_report(findings=findings)
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertTrue(md.startswith("# Real Title"))
+        self.assertNotIn("Bogus Override", md)
+        self.assertNotIn("Codebase evolutionary analysis", md)  # generic fallback
+
+    def test_title_block_without_h1_falls_back_not_uses_block(self) -> None:
+        # With only a `## title` block and no H1, the block is ignored and the
+        # generic fallback title is used (the block never becomes the title).
+        rc, stderr, md = self.run_report(findings="## title\nShould Be Ignored\n")
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertNotIn("Should Be Ignored", md)
+        self.assertTrue(md.startswith("# Codebase evolutionary analysis"))
+
+
 class TestEmpty(ReportCase):
     def test_no_inputs_exit_3(self) -> None:
         rc, stderr, _md = self.run_report()

@@ -2,7 +2,7 @@
 id: cod-2xyu
 status: closed
 deps: [cod-gijq, cod-9yuv]
-links: []
+links: [cod-84ky, cod-a1gr, cod-a6wv]
 created: 2026-07-15T10:01:20Z
 type: feature
 priority: 1
@@ -14,7 +14,7 @@ tags: [codelens, viz-skill, reporting, feature]
 Turn a full codelens run into one sequenced findings **report**: a single
 self-contained plain-markdown document that walks the crime-scene investigation in
 the book's order, embeds the static figures, and carries the agent's interpretation
-of each analysis. Plain markdown only — NO MARP, no slide deck (an earlier MARP
+of each analysis. Plain markdown only - NO MARP, no slide deck (an earlier MARP
 decision was reverted). The structure, flow, and interpretation are fixed; only the
 prose is authored per run.
 
@@ -36,7 +36,7 @@ guardrails).
 - Inputs: the analysis JSONs (for headline numbers and to know which analyses ran),
   the rendered degraded figures (SVG files from `treemap.py`/`pair_matrix.py` and the
   existing static charts), and the agent-authored findings file.
-- Output: `report.md` — a flowing narrative document: an H1 title, H2 sections in the
+- Output: `report.md` - a flowing narrative document: an H1 title, H2 sections in the
   fixed sequence below, prose, and each figure embedded as **inline `<svg>`** so the
   file is self-contained (one portable file, no external asset references).
 - Follow the Python static-lane conventions (PEP 723 header, `uv run`, a
@@ -63,14 +63,14 @@ placeholder, not a crash.
    Red/Yellow/Green if provided).
 3. Hotspots (treemap + top offenders).
 4. Complexity trend (per top hotspot).
-5. Change coupling, file + component (pair_matrix) — architecture.
+5. Change coupling, file + component (pair_matrix) - architecture.
 6. Knowledge / ownership (treemap by owner) + social disclaimer.
 7. Fractal / fragmentation.
 8. Communication / Conway network (pair_matrix) + team-aggregation note + disclaimer.
-9. Code-age (treemap by age) — stabilization framing.
-10. Churn trend — business backdrop.
-11. Commit word cloud — labeled heuristic / conversation-starter.
-12. Closing — risk choices (accept / prioritise low-risk / mitigate) + next actions.
+9. Code-age (treemap by age) - stabilization framing.
+10. Churn trend - business backdrop.
+11. Commit word cloud - labeled heuristic / conversation-starter.
+12. Closing - risk choices (accept / prioritise low-risk / mitigate) + next actions.
 
 Lead/support emphasis (from the interpretation reference): summary, hotspots,
 complexity trend, coupling, knowledge map are the leads; code-age, fractal, Conway,

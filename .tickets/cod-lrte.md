@@ -110,7 +110,7 @@ first consumer. Do not add a warning caller here beyond what a test needs.
 
 Behavior through public functions and the CLI, not internals.
 
-1. `TestEmitError_AlwaysJSON`: call `EmitError` — assert a valid JSON error
+1. `TestEmitError_AlwaysJSON`: call `EmitError` - assert a valid JSON error
    envelope is written (parse it; check `ok:false`, `code`, `message`). Table over
    several errors (coded, usage-classified, plain). Replaces the text-format
    assertions.
