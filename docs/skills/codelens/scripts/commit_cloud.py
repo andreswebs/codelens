@@ -48,8 +48,12 @@ def load(path: str) -> list[dict[str, Any]]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Commit-message word cloud.")
-    ap.add_argument("-i", "--input", default="-", help="codelens parse JSON, or '-' for stdin")
-    ap.add_argument("--extra-stopwords", default="", help="comma-separated words to also drop")
+    ap.add_argument(
+        "-i", "--input", default="-", help="codelens parse JSON, or '-' for stdin"
+    )
+    ap.add_argument(
+        "--extra-stopwords", default="", help="comma-separated words to also drop"
+    )
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
 
@@ -81,14 +85,22 @@ def main() -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    wc = WordCloud(width=1200, height=700, background_color="white",
-                   prefer_horizontal=0.9, collocations=False).generate_from_frequencies(freq)
+    wc = WordCloud(
+        width=1200,
+        height=700,
+        background_color="white",
+        prefer_horizontal=0.9,
+        collocations=False,
+    ).generate_from_frequencies(freq)
     fig, ax = plt.subplots(figsize=(12, 7))
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
     fig.tight_layout(pad=0)
     fig.savefig(args.out)
-    print(f"wrote {args.out} ({len(by_rev)} commits, {len(freq)} distinct words)", file=sys.stderr)
+    print(
+        f"wrote {args.out} ({len(by_rev)} commits, {len(freq)} distinct words)",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

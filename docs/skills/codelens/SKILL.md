@@ -5,8 +5,6 @@ description: "Operate the codelens CLI and visualize its output. Mine a git log 
 
 # codelens code base visualization
 
-_Input contracts verified against codelens build eaece4f; all ten visualizations implemented. See docs/skill-design.md for build state._
-
 Turn `codelens` output into the crime-scene visualizations from Adam Tornhill's _Your Code as a Crime Scene_. The recurring picture is a **hotspot**: complex code that changes often. Every run follows one pipeline; the visualization chosen decides the data collected and the script run.
 
 `codelens` mines a git log and emits structured JSON. This skill both operates the
@@ -36,7 +34,7 @@ sidecars, formats, and how to read the result).
 | Do teams align with code?        | Communication network | `communication`                                  | `dev_network.py`      | yes         |
 | How much churn, over time?       | Churn trend           | `absolute-churn`, `author-churn`, `entity-churn` | `churn.py`            | no          |
 | How is effort shared per module? | Fractal figures       | `entity-effort`, `fragmentation`                 | `fractal.py`          | no          |
-| What does the team talk about?   | Commit word cloud     | `parse` (message column)                         | `commit_cloud.py`        | no          |
+| What does the team talk about?   | Commit word cloud     | `parse` (message column)                         | `commit_cloud.py`     | no          |
 | Is this hotspot deteriorating?   | Complexity trend      | none (live repo)                                 | `complexity_trend.py` | no          |
 | What is the headline?            | Summary tiles         | `summary`                                        | `churn.py --summary`  | no          |
 
@@ -90,12 +88,29 @@ Target mechanics (inline SVG, iframe) are in [embedding.md](references/embedding
 
 ### 5. Read the crime scene
 
-State the finding in the visualization's own terms using the card's
-interpretation: hotspot concentration, trend shape (deteriorating / refactored /
-stable), ownership pattern (single / balanced / many minor contributors), or
-Conway alignment. A visualization delivered without this reading is incomplete.
+State the finding in the visualization's own terms.
+[interpretation.md](references/interpretation.md) is the reading authority: the
+investigative funnel that orders an investigation, a reading block per
+visualization, the heuristics table (every number, in one place), and the misuse
+guardrails the social analyses must respect (never rank individuals; aggregate to
+teams; findings are probabilistic). A visualization delivered without this reading
+is incomplete.
 
-**Done when:** the finding is named, not just the chart handed over.
+**Done when:** the finding is named, in the terms `interpretation.md` gives — not
+just the chart handed over.
+
+### 6. Compose the report (optional)
+
+When the deliverable is a sequenced findings report rather than a single chart,
+assemble one self-contained markdown document with `scripts/report.py`: render the
+degraded static figures (`treemap.py`, `pair_matrix.py`, and the static charts) into
+one directory, write a findings file (your reading of each analysis, per
+[interpretation.md](references/interpretation.md)), and run the assembler. It pins
+the investigative sequence, embeds the figures inline as SVG, and always emits the
+social-analysis guardrails. See [reporting.md](references/reporting.md).
+
+**Done when:** `report.py` exits `0` and `report.md` carries every section with its
+findings and figures.
 
 ## Determinism boundary
 

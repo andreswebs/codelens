@@ -2,7 +2,7 @@
 id: cod-a1gr
 status: closed
 deps: []
-links: [cod-l1az]
+links: [cod-l1az, cod-gijq]
 created: 2026-07-15T03:40:57Z
 type: feature
 priority: 1

@@ -45,7 +45,12 @@ def rows(path: str) -> list[dict[str, Any]]:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Fractal figures of developer effort.")
     ap.add_argument("--effort", required=True, help="codelens entity-effort JSON")
-    ap.add_argument("--top", type=int, default=16, help="show the N entities with the most total revs")
+    ap.add_argument(
+        "--top",
+        type=int,
+        default=16,
+        help="show the N entities with the most total revs",
+    )
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
 
@@ -81,17 +86,28 @@ def main() -> None:
         shares = sorted(per_entity[entity].items(), key=lambda kv: kv[1], reverse=True)
         sizes = [v for _, v in shares]
         colors = [color_of[a] for a, _ in shares]
-        squarify.plot(sizes=sizes, color=colors, ax=ax, pad=True,
-                      bar_kwargs={"edgecolor": "white", "linewidth": 0.5})
-        ax.set_title(f"{entity.split('/')[-1]}\n{len(shares)} devs, {totals[entity]} revs", fontsize=8)
+        squarify.plot(
+            sizes=sizes,
+            color=colors,
+            ax=ax,
+            pad=True,
+            bar_kwargs={"edgecolor": "white", "linewidth": 0.5},
+        )
+        ax.set_title(
+            f"{entity.split('/')[-1]}\n{len(shares)} devs, {totals[entity]} revs",
+            fontsize=8,
+        )
         ax.axis("off")
-    for ax in axes[len(top):]:
+    for ax in axes[len(top) :]:
         ax.axis("off")
 
     fig.suptitle("Developer effort per module (area = revision share)", fontsize=12)
     fig.tight_layout()
     fig.savefig(args.out)
-    print(f"wrote {args.out} ({len(top)} modules, {len(authors)} authors)", file=sys.stderr)
+    print(
+        f"wrote {args.out} ({len(top)} modules, {len(authors)} authors)",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

@@ -103,7 +103,9 @@ class EnclosureCase(unittest.TestCase):
             ]
             if structure is not None:
                 spath = dp / "structure.json"
-                spath.write_text(json.dumps(_structure_doc(structure)), encoding="utf-8")
+                spath.write_text(
+                    json.dumps(_structure_doc(structure)), encoding="utf-8"
+                )
                 argv += ["--structure", str(spath)]
             if extra:
                 argv += extra
@@ -251,7 +253,13 @@ class TestPathFilter(EnclosureCase):
                 "src/Page.Designer.cs": 50,
                 "src/app.g.dart": 30,
             },
-            extra=["--categorical", "--include", "**/*.cs", "--exclude", "**/*.Designer.cs"],
+            extra=[
+                "--categorical",
+                "--include",
+                "**/*.cs",
+                "--exclude",
+                "**/*.Designer.cs",
+            ],
         )
         self.assertEqual(rc, 0, msg=stderr)
         assert tree is not None

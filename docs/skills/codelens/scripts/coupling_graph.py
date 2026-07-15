@@ -64,10 +64,17 @@ def render(template: Path, data: dict[str, Any], title: str, subtitle: str) -> s
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Change-coupling graph (interactive HTML).")
+    ap = argparse.ArgumentParser(
+        description="Change-coupling graph (interactive HTML)."
+    )
     ap.add_argument("--coupling", required=True, help="codelens coupling JSON")
     ap.add_argument("--soc", help="codelens sum-of-coupling JSON (node size)")
-    ap.add_argument("--min-degree", type=float, default=0.0, help="drop edges below this coupling degree")
+    ap.add_argument(
+        "--min-degree",
+        type=float,
+        default=0.0,
+        help="drop edges below this coupling degree",
+    )
     ap.add_argument("--template", default=None)
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
@@ -85,20 +92,39 @@ def main() -> None:
 
     soc = {r["entity"]: r["soc"] for r in rows(args.soc)} if args.soc else {}
     nodes = [
-        {"id": nid, "label": nid.split("/")[-1], "group": component(nid), "val": soc.get(nid, 1)}
+        {
+            "id": nid,
+            "label": nid.split("/")[-1],
+            "group": component(nid),
+            "val": soc.get(nid, 1),
+        }
         for nid in sorted(node_ids)
     ]
 
-    tpl = Path(args.template) if args.template else (
-        Path(__file__).parent.parent / "assets" / "templates" / "force-network.html.jinja"
+    tpl = (
+        Path(args.template)
+        if args.template
+        else (
+            Path(__file__).parent.parent
+            / "assets"
+            / "templates"
+            / "force-network.html.jinja"
+        )
     )
     if not tpl.is_file():
         die(f"template not found: {tpl}", 2)
 
-    html = render(tpl, {"nodes": nodes, "links": links},
-                  "Change coupling", "node = file (color = folder), edge = co-change; drag to explore")
+    html = render(
+        tpl,
+        {"nodes": nodes, "links": links},
+        "Change coupling",
+        "node = file (color = folder), edge = co-change; drag to explore",
+    )
     Path(args.out).write_text(html, encoding="utf-8")
-    print(f"wrote {args.out} ({len(nodes)} files, {len(links)} couplings)", file=sys.stderr)
+    print(
+        f"wrote {args.out} ({len(nodes)} files, {len(links)} couplings)",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

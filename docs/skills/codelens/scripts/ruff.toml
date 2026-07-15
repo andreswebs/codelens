@@ -1,0 +1,22 @@
+# Ruff configuration for the codelens skill's standalone scripts.
+#
+# These are PEP 723 single-file programs run with `uv run`; there is no
+# pyproject.toml, so this file pins the lint and format style co-located with the
+# scripts it governs, making `ruff check` and `ruff format` reproducible in CI and
+# in an editor. Ruff discovers it as the nearest config when checking these files.
+
+target-version = "py312"
+line-length = 88
+
+[lint]
+# Ruff's default rule set (pyflakes + a focused pycodestyle subset), pinned so it
+# does not drift with Ruff releases. Deliberately minimal: E501 (line too long),
+# T201 (print), and missing-docstring rules are noise for CLI scripts and are left
+# off, matching the project's Python conventions.
+select = ["E4", "E7", "E9", "F"]
+
+[format]
+# Ruff's defaults (double quotes, space indentation, trailing commas). Declared
+# explicitly so the format contract is visible and stable.
+quote-style = "double"
+indent-style = "space"

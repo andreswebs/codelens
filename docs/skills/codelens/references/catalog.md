@@ -5,6 +5,10 @@ One card per visualization: what it **consumes**, the **command** to build it, t
 after routing. Column names are codelens JSON (snake_case), verified against build
 eaece4f; re-check with `codelens schema --command <analysis>` after codelens changes.
 
+Each card's **Read:** line is a hook; the full reading — the investigative funnel,
+the heuristics table, the misuse guardrails, and how to phrase the finding — is in
+[interpretation.md](interpretation.md).
+
 ---
 
 ## Hotspot enclosure map
@@ -12,9 +16,13 @@ eaece4f; re-check with `codelens schema --command <analysis>` after codelens cha
 - **Consumes:** `codelens revisions` -> `entity, n_revs`.
 - **Sidecar:** `tokei --output json` (size). Optional; degrades to revisions-as-size.
 - **Command:** `uv run scripts/enclosure.py --weights revs.json --structure tokei.json -o hotspots.html`
-- **Formats:** interactive HTML (iframe embed; not exported to static).
-- **Read:** big + hot (large, red) circles are the offender profile. Hotspots are
-  1-5% of files yet 25-75% of defects. Contract: [enclosure.md](enclosure.md).
+- **Static:** `uv run scripts/treemap.py --weights revs.json --structure tokei.json -o hotspots.svg` (embeddable SVG/PNG; same flags and structure-first node set as `enclosure.py`).
+- **Formats:** interactive HTML (iframe embed); static counterpart below.
+- **Read:** the **offender profile** is big + hot, but colour (change) is the lead
+  signal and size (LOC) the severity multiplier — a large pale circle is
+  complex-but-stable. Scope out generated files first (false positives). Heuristics
+  and full reading: [interpretation.md](interpretation.md). Contract:
+  [enclosure.md](enclosure.md).
 
 ## Knowledge map
 
@@ -24,21 +32,26 @@ eaece4f; re-check with `codelens schema --command <analysis>` after codelens cha
   `--use-mailmap`, so a repo `.mailmap` collapses them for free; when there is no
   `.mailmap`, map aliases to a canonical name with `--team-map`.
 - **Command:** `uv run scripts/enclosure.py --weights main-dev.json --weight-col main_dev --categorical --structure tokei.json -o knowledge.html`
-- **Formats:** interactive HTML (iframe embed; not exported to static).
+- **Static:** `uv run scripts/treemap.py --weights main-dev.json --weight-col main_dev --categorical --structure tokei.json -o knowledge.svg`.
+- **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** one color per developer, circles sized by tokei LOC. With `--structure`
   the node set is the tokei files (same as the hotspot and code-age maps, so all
   three are comparable); a file with no recorded author renders neutral grey
   (`(unowned)`). Single-color components are key-person dependencies; mixed
-  components are shared effort. See [enclosure.md](enclosure.md).
+  components are shared effort. The main developer's ownership *degree* is the real
+  signal, not just single-vs-mixed colour. See [enclosure.md](enclosure.md) and the
+  reading in [interpretation.md](interpretation.md).
 
 ## Code-age map
 
 - **Consumes:** `codelens code-age` -> `entity, age_months`.
 - **Sidecar:** `tokei --output json`.
 - **Command:** `uv run scripts/enclosure.py --weights age.json --weight-col age_months --invert --structure tokei.json -o age.html`
-- **Formats:** interactive HTML (iframe embed; not exported to static).
-- **Read:** hot = recently changed (low age). Stable cores should be cool; churning
-  old code that should be frozen is a smell.
+- **Static:** `uv run scripts/treemap.py --weights age.json --weight-col age_months --invert --structure tokei.json -o age.svg`.
+- **Formats:** interactive HTML (iframe embed); static counterpart below.
+- **Read:** hot = recently changed (low age). Read through **stabilization**: stable
+  cores are a virtue, and old code that still churns is a low-cohesion smell (no age
+  threshold or "frozen" rule). Reading: [interpretation.md](interpretation.md).
 - **Full history required:** run `code-age` against full history, not a window
   scoped with `--after`. Age is measured from the log's earliest commit, so a
   scoped window caps every file's reported `age_months` at the window length and
@@ -59,10 +72,14 @@ eaece4f; re-check with `codelens schema --command <analysis>` after codelens cha
 - **Consumes:** `codelens coupling` -> `entity, coupled, degree, average_revs`;
   `sum-of-coupling` for node weight.
 - **Command:** `uv run scripts/coupling_graph.py --coupling coupling.json -o coupling.html`
-- **Formats:** interactive HTML (iframe embed; not exported to static).
-- **Read:** edges are files that change together. High-degree edges crossing
-  architectural boundaries (group with `--group`) signal decay: copy-paste,
-  unsupportive module boundaries, or producer-consumer.
+- **Static:** `uv run scripts/pair_matrix.py --pairs coupling.json --a-col entity --b-col coupled --weight-col degree -o coupling.svg` (adjacency-matrix heatmap of the top-N most-coupled entities).
+- **Formats:** interactive HTML (iframe embed); static counterpart below.
+- **Read:** edges co-change (degree = % shared commits; node weight =
+  sum-of-coupling = architectural centrality). The signal is **surprising** coupling
+  that crosses an architectural boundary (group with `--group`), not raw high degree
+  — a test and its implementation sit near 100% and are benign. Causes: copy-paste
+  (extract), unsupportive module boundaries (co-locate), producer-consumer (often
+  legitimate). Reading: [interpretation.md](interpretation.md).
 - **Empty result:** grouping to components dilutes per-pair degrees, so the
   default `--min-coupling 30` can filter everything and return `rows: []`. When
   that happens codelens emits a `coupling_all_filtered` warning on stderr naming
@@ -78,9 +95,12 @@ eaece4f; re-check with `codelens schema --command <analysis>` after codelens cha
   removed a spurious self-tie).
 - **Sidecar (optional):** `--team-map` to collapse authors to teams.
 - **Command:** `uv run scripts/dev_network.py --communication comm.json -o network.html`
-- **Formats:** interactive HTML (iframe embed; not exported to static).
-- **Read:** Conway litmus test. Dense intra-team links = healthy; many inter-team
-  links = coordination bottleneck.
+- **Static:** `uv run scripts/pair_matrix.py --pairs comm.json --a-col author --b-col peer --weight-col strength --note 'coordination risk, not a performance ranking' -o network.svg`.
+- **Formats:** interactive HTML (iframe embed); static counterpart below.
+- **Read:** Conway litmus test — aggregate authors to teams first (`--team-map`).
+  Mostly intra-team links = healthy; inter-team links are *potential* coordination
+  bottlenecks (the usual fix is cohesion, not reorg). Reading:
+  [interpretation.md](interpretation.md).
 
 ## Churn trend
 
@@ -97,16 +117,19 @@ eaece4f; re-check with `codelens schema --command <analysis>` after codelens cha
 total_revs`; `fragmentation` for the scalar.
 - **Command:** `uv run scripts/fractal.py --effort effort.json -o fractal.svg`
 - **Formats:** SVG or PNG (the -o extension picks the format).
-- **Read:** three ownership patterns: single developer, balanced (high main-dev
-  ownership predicts fewer defects), many minor contributors (defect risk).
+- **Read:** three ownership patterns: single developer, balanced (higher main-dev
+  ownership predicts fewer defects), many minor contributors (defect risk — the
+  *count* of minor contributors is the stronger predictor). Reading:
+  [interpretation.md](interpretation.md).
 
 ## Commit word cloud
 
 - **Consumes:** `codelens parse` -> the `message` column.
 - **Command:** `codelens parse --log git.log --format json | uv run scripts/commit_cloud.py -o cloud.svg`
 - **Formats:** SVG or PNG (the -o extension picks the format).
-- **Read:** dominant words show where time goes. Domain terms = good; "bug",
-  "crash", "test", "bump" = drill deeper.
+- **Read:** heuristic only, a conversation starter. Dominant words show where time
+  goes: domain terms = good; "bug", "crash", "revert", "bump" = drill deeper.
+  Reading: [interpretation.md](interpretation.md).
 
 ## Complexity trend
 
@@ -114,7 +137,9 @@ total_revs`; `fragmentation` for the scalar.
 - **Command:** `uv run scripts/complexity_trend.py --repo . --file path/to/hotspot -o trend.svg`
 - **Formats:** SVG or PNG (the -o extension picks the format).
 - **Read:** indentation complexity over revisions. Shapes: deteriorating (act),
-  refactored (dip = good), stable. Plot LOC alongside to see growth vs. thickening.
+  refactored (dip = good), stable. Overlay LOC: rising with LOC = growth by
+  addition; complexity outpacing LOC = deterioration. Reading:
+  [interpretation.md](interpretation.md).
 
 ## Summary tiles
 

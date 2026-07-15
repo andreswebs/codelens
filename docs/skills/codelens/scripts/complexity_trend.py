@@ -35,7 +35,10 @@ _HASH = re.compile(r"\A[0-9a-f]{40}\Z")
 def git(repo: str, *args: str) -> str:
     r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
     if r.returncode != 0:
-        print(f"complexity_trend.py: git {' '.join(args)}: {r.stderr.strip()}", file=sys.stderr)
+        print(
+            f"complexity_trend.py: git {' '.join(args)}: {r.stderr.strip()}",
+            file=sys.stderr,
+        )
         raise SystemExit(2)
     return r.stdout
 
@@ -48,8 +51,17 @@ def enumerate_revs(repo: str, file: str, rng: str) -> list[tuple[str, str, str]]
     surfaces that path per commit: a rename is `R<score>\\t<old>\\t<new>` (the new
     side is the path this commit produced), everything else is `<status>\\t<path>`.
     """
-    log = git(repo, "log", "--follow", "--name-status",
-              "--format=%H\t%ad", "--date=short", rng, "--", file)
+    log = git(
+        repo,
+        "log",
+        "--follow",
+        "--name-status",
+        "--format=%H\t%ad",
+        "--date=short",
+        rng,
+        "--",
+        file,
+    )
     revs: list[tuple[str, str, str]] = []
     rev: str | None = None
     date = ""
@@ -87,12 +99,16 @@ def indentation(source: str) -> tuple[int, float]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Indentation-complexity trend for one file.")
+    ap = argparse.ArgumentParser(
+        description="Indentation-complexity trend for one file."
+    )
     ap.add_argument("--repo", default=".")
     ap.add_argument("--file", required=True, help="repo-relative path to the hotspot")
     ap.add_argument("--start", help="oldest commit-ish (default: full history)")
     ap.add_argument("--end", default="HEAD")
-    ap.add_argument("-o", "--out", required=True, help="output SVG/PNG (extension picks format)")
+    ap.add_argument(
+        "-o", "--out", required=True, help="output SVG/PNG (extension picks format)"
+    )
     args = ap.parse_args()
 
     rng = f"{args.start}..{args.end}" if args.start else args.end

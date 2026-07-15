@@ -61,9 +61,15 @@ def render(template: Path, data: dict[str, Any], title: str, subtitle: str) -> s
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Developer/communication network (interactive HTML).")
-    ap.add_argument("--communication", required=True, help="codelens communication JSON")
-    ap.add_argument("--min-strength", type=float, default=0.0, help="drop links below this strength")
+    ap = argparse.ArgumentParser(
+        description="Developer/communication network (interactive HTML)."
+    )
+    ap.add_argument(
+        "--communication", required=True, help="codelens communication JSON"
+    )
+    ap.add_argument(
+        "--min-strength", type=float, default=0.0, help="drop links below this strength"
+    )
     ap.add_argument("--template", default=None)
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
@@ -81,16 +87,29 @@ def main() -> None:
     if not links:
         die("no links above --min-strength", 3)
 
-    nodes = [{"id": nid, "val": round(v, 1)} for nid, v in sorted(strength_total.items())]
+    nodes = [
+        {"id": nid, "val": round(v, 1)} for nid, v in sorted(strength_total.items())
+    ]
 
-    tpl = Path(args.template) if args.template else (
-        Path(__file__).parent.parent / "assets" / "templates" / "force-network.html.jinja"
+    tpl = (
+        Path(args.template)
+        if args.template
+        else (
+            Path(__file__).parent.parent
+            / "assets"
+            / "templates"
+            / "force-network.html.jinja"
+        )
     )
     if not tpl.is_file():
         die(f"template not found: {tpl}", 2)
 
-    html = render(tpl, {"nodes": nodes, "links": links},
-                  "Communication network", "node = author/team, edge = shared work (strength); drag to explore")
+    html = render(
+        tpl,
+        {"nodes": nodes, "links": links},
+        "Communication network",
+        "node = author/team, edge = shared work (strength); drag to explore",
+    )
     Path(args.out).write_text(html, encoding="utf-8")
     print(f"wrote {args.out} ({len(nodes)} people, {len(links)} ties)", file=sys.stderr)
 

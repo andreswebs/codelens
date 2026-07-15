@@ -6,8 +6,10 @@ canonical form; pick the artifact that fits the target.
 - **Static** visualizations (churn, fractal, word cloud, complexity trend,
   summary) emit **SVG** (canonical) and **PNG** (fallback).
 - **Interactive** visualizations (enclosure, coupling, network) emit an **HTML**
-  file for live viewing and iframe embedding. They are not exported to static
-  images; when a slide or PDF needs a picture, use a static visualization.
+  file for live viewing and iframe embedding. For a static picture (slide, PDF,
+  report), render the **degraded counterpart** from the same JSON: `treemap.py` for
+  the enclosure family (hotspot / knowledge / code-age), `pair_matrix.py` for
+  coupling and the communication network. Both emit SVG (canonical) or PNG.
 
 ## Format to target
 

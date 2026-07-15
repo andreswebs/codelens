@@ -112,9 +112,7 @@ def compile_globs(patterns: list[str]) -> list[re.Pattern[str]]:
     return compiled
 
 
-def make_path_filter(
-    includes: list[str], excludes: list[str]
-) -> Callable[[str], bool]:
+def make_path_filter(includes: list[str], excludes: list[str]) -> Callable[[str], bool]:
     """Build an exclude-after-include predicate over normalized paths: if any
     include is given a path must match one, then any exclude match drops it."""
     inc = compile_globs(includes)
@@ -217,17 +215,49 @@ def render_html(template: str, data: dict[str, Any], vendor_d3: Path | None) -> 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build an enclosure (circle-packing) map.")
-    ap.add_argument("--weights", required=True, help="codelens analysis JSON, or '-' for stdin")
-    ap.add_argument("--weight-col", default="n_revs", help="row column used as the weight")
-    ap.add_argument("--structure", help="tokei --output json (size source); omit to degrade")
-    ap.add_argument("--categorical", action="store_true", help="weight is a category (knowledge map)")
-    ap.add_argument("--invert", action="store_true", help="invert numeric weight (low = hot, e.g. age)")
+    ap.add_argument(
+        "--weights", required=True, help="codelens analysis JSON, or '-' for stdin"
+    )
+    ap.add_argument(
+        "--weight-col", default="n_revs", help="row column used as the weight"
+    )
+    ap.add_argument(
+        "--structure", help="tokei --output json (size source); omit to degrade"
+    )
+    ap.add_argument(
+        "--categorical",
+        action="store_true",
+        help="weight is a category (knowledge map)",
+    )
+    ap.add_argument(
+        "--invert",
+        action="store_true",
+        help="invert numeric weight (low = hot, e.g. age)",
+    )
     ap.add_argument("--root-name", default="root")
-    ap.add_argument("--path-prefix", default="", help="strip this prefix from tokei/weight paths")
-    ap.add_argument("--include", action="append", metavar="GLOB", help="keep only paths matching GLOB (gitignore-style, repeatable; exclude wins)")
-    ap.add_argument("--exclude", action="append", metavar="GLOB", help="drop paths matching GLOB (gitignore-style, repeatable; applied after --include)")
-    ap.add_argument("--template", default=None, help="HTML template (default: assets/templates/circle-packing.html.jinja)")
-    ap.add_argument("--vendor-d3", default=None, help="path to a vendored d3 bundle to inline")
+    ap.add_argument(
+        "--path-prefix", default="", help="strip this prefix from tokei/weight paths"
+    )
+    ap.add_argument(
+        "--include",
+        action="append",
+        metavar="GLOB",
+        help="keep only paths matching GLOB (gitignore-style, repeatable; exclude wins)",
+    )
+    ap.add_argument(
+        "--exclude",
+        action="append",
+        metavar="GLOB",
+        help="drop paths matching GLOB (gitignore-style, repeatable; applied after --include)",
+    )
+    ap.add_argument(
+        "--template",
+        default=None,
+        help="HTML template (default: assets/templates/circle-packing.html.jinja)",
+    )
+    ap.add_argument(
+        "--vendor-d3", default=None, help="path to a vendored d3 bundle to inline"
+    )
     ap.add_argument("-o", "--out", required=True, help="output HTML file")
     ap.add_argument("--json-out", help="also write the intermediate hierarchy JSON")
     args = ap.parse_args()
@@ -240,7 +270,7 @@ def main() -> None:
         if not args.path_prefix:
             return m
         pre = norm_path(args.path_prefix).rstrip("/") + "/"
-        return {(k[len(pre):] if k.startswith(pre) else k): v for k, v in m.items()}
+        return {(k[len(pre) :] if k.startswith(pre) else k): v for k, v in m.items()}
 
     weights = strip_prefix(weights)
 
@@ -305,8 +335,15 @@ def main() -> None:
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(tree, indent=2), encoding="utf-8")
 
-    tpl_path = Path(args.template) if args.template else (
-        Path(__file__).parent.parent / "assets" / "templates" / "circle-packing.html.jinja"
+    tpl_path = (
+        Path(args.template)
+        if args.template
+        else (
+            Path(__file__).parent.parent
+            / "assets"
+            / "templates"
+            / "circle-packing.html.jinja"
+        )
     )
     if not tpl_path.is_file():
         die(f"template not found: {tpl_path}", EXIT_USAGE)
