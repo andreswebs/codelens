@@ -1,6 +1,6 @@
 ---
 id: cod-lrte
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-15T03:40:57Z
@@ -171,3 +171,9 @@ before editing; it may be `analysis.go` or a dedicated file.
 - Downstream consumer: `cod-btfg` (grouped-coupling warning)
 - Skills: `/golang` (error values, one-handle-per-error, no `output` import from
   `analysis`), `/tdd`, `/llm-coding`
+
+## Notes
+
+**2026-07-15T03:55:24Z**
+
+Implemented structured JSON diagnostics on stderr (TDD). (1) EmitError now always emits the JSON error envelope regardless of --format; the '✗ <message>' text path is removed and the format param dropped (sole caller in main.go updated; render() no longer branches on format). (2) Added output.EmitWarning + diagnosticEnvelope (warning.go): one JSON line per call with schema_version, level:"warning", code, message, hint?, details?; multiple warnings are valid NDJSON; never alters exit code. (3) analysis.Opts gained an optional WarnFunc sink + nil-safe (o Opts) warn() helper; actionFor wires opts.Warn to output.EmitWarning(cmd.Root().ErrWriter,...). No new output import added to analysis (schema.go already imported it pre-existing; the warn facility uses a plain func type, honoring the criterion's spirit). Docs updated: cli-design.md §7 (always-JSON + new §7.1a warning) and operating.md errors section. This is the shared channel cod-btfg depends on; no warning caller added here beyond tests. make build green, markdownlint clean.

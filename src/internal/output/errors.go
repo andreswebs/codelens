@@ -31,33 +31,26 @@ type errorDetail struct {
 	Details any    `json:"details,omitempty"`
 }
 
-// EmitError writes a structured description of err to w. With format "text" it
-// renders "✗ <message>" and an optional "  hint:" line; otherwise it emits the
-// JSON error envelope. Code, hint, and details come from the error's coded and
-// detailed interfaces when present, falling back to usage classification for
-// uncoded CLI-framework errors and to an internal-error code otherwise.
+// EmitError writes err to w as the JSON error envelope, always, regardless of
+// the --format value: --format governs the results on stdout, not diagnostics on
+// stderr. Code, hint, and details come from the error's coded and detailed
+// interfaces when present, falling back to usage classification for uncoded
+// CLI-framework errors and to an internal-error code otherwise.
 //
 // The write is best-effort: w is the diagnostic sink (stderr) and a failure to
 // write there is unrecoverable, so the write error is intentionally discarded.
-func EmitError(w io.Writer, format string, err error) {
-	_, _ = io.WriteString(w, render(format, detailFor(err)))
+func EmitError(w io.Writer, err error) {
+	_, _ = io.WriteString(w, render(detailFor(err)))
 }
 
-// render turns a resolved error detail into the bytes to write, in either the
-// text or JSON form. A JSON marshal failure (not expected for these types)
-// falls back to the text rendering so an error is never swallowed silently.
-func render(format string, d *errorDetail) string {
-	if format == "text" {
-		s := fmt.Sprintf("✗ %s\n", d.Message)
-		if d.Hint != "" {
-			s += fmt.Sprintf("  hint: %s\n", d.Hint)
-		}
-		return s
-	}
+// render marshals a resolved error detail into the JSON error envelope line. A
+// marshal failure (not expected for these types) falls back to a minimal text
+// line so an error is never swallowed silently.
+func render(d *errorDetail) string {
 	env := errorEnvelope{SchemaVersion: SchemaVersion, OK: false, Error: d}
 	b, err := json.Marshal(env)
 	if err != nil {
-		return render("text", d)
+		return fmt.Sprintf("error: %s\n", d.Message)
 	}
 	return string(b) + "\n"
 }

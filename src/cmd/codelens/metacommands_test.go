@@ -17,6 +17,9 @@ func TestSchema_Command_PrintLogCommand(t *testing.T) {
 	if !hasFlag(got, "after") {
 		t.Errorf("flags = %+v, want to include after", got.Flags)
 	}
+	if !hasFlag(got, "all") {
+		t.Errorf("flags = %+v, want to include all", got.Flags)
+	}
 	if len(got.RowSchema) != 0 {
 		t.Errorf("row_schema = %+v, want none for a meta command", got.RowSchema)
 	}
@@ -44,25 +47,6 @@ func TestSchema_Command_Schema(t *testing.T) {
 	}
 	if !equalInts(got.ExitCodes, []int{0, 2}) {
 		t.Errorf("exit_codes = %v, want [0 2]", got.ExitCodes)
-	}
-}
-
-// TestSchema_Command_Version asserts the version command is introspectable with
-// no flags, no row schema, and only the success exit code.
-func TestSchema_Command_Version(t *testing.T) {
-	got := schemaOf(t, "version")
-
-	if got.Command != "version" {
-		t.Errorf("Command = %q, want %q", got.Command, "version")
-	}
-	if len(got.Flags) != 0 {
-		t.Errorf("flags = %+v, want none", got.Flags)
-	}
-	if len(got.RowSchema) != 0 {
-		t.Errorf("row_schema = %+v, want none", got.RowSchema)
-	}
-	if !equalInts(got.ExitCodes, []int{0}) {
-		t.Errorf("exit_codes = %v, want [0]", got.ExitCodes)
 	}
 }
 

@@ -1,6 +1,6 @@
 ---
 id: cod-l1az
-status: open
+status: closed
 deps: []
 links: [cod-a1gr]
 created: 2026-07-15T03:40:57Z
@@ -120,3 +120,9 @@ docs/skills/codelens/references/catalog.md                    knowledge-map card
 - `docs/skills/codelens/references/enclosure.md`, `references/catalog.md`
 - Linked: the path include/exclude ticket (both edit `enclosure.py`).
 - Skills: `/tdd`, `/llm-coding`.
+
+## Notes
+
+**2026-07-15T04:03:48Z**
+
+Unified enclosure.py node set structure-first (approach A). --structure now the node set for ALL modes incl. categorical (was weights-only, uniform size 1); circles sized by tokei code everywhere. Missing-weight rule uniform: numeric -> weight 0.0 (cold end; also fixes latent --invert bug where norm(lo)=1.0 drew unchanged files HOT on code-age); categorical -> reserved '(unowned)' sentinel (UNOWNED_CATEGORY). Template gained real categorical coloring via leafFill(): schemeTableau10 per dev, neutral grey #5a6270 for the sentinel, unchanged sequential scale for numeric. Degraded (no --structure) path untouched. Tests: enclosure_test.py drives the script as a subprocess over --json-out + the file count (stdlib-only, no runner in make build; run 'python3 -m unittest enclosure_test'). Docs: enclosure.md + knowledge-map catalog card document the unified rule. Unblocks cod-a1gr Part B (both edit main() / same sizes+weights dicts).

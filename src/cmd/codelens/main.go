@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -13,6 +14,16 @@ import (
 	"github.com/andreswebs/codelens/internal/version"
 	"github.com/urfave/cli/v3"
 )
+
+// init prints --version as the bare version string (no "codelens version "
+// prefix from urfave's default template), so it is trivial to capture and
+// compare in scripts. It writes to the command's configured writer, keeping
+// stdout-capturing tests working, and version.Current() stays the single source.
+func init() {
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		_, _ = fmt.Fprintln(cmd.Root().Writer, cmd.Root().Version)
+	}
+}
 
 // run builds the root command, executes it against args (argv-style, including
 // the program name), and returns the process exit code. The log is read from
@@ -67,7 +78,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if debug {
 		slog.New(slog.NewJSONHandler(stderr, nil)).Error("command failed", "error", err)
 	}
-	output.EmitError(stderr, format, err)
+	output.EmitError(stderr, err)
 	return output.ExitCodeFor(err)
 }
 

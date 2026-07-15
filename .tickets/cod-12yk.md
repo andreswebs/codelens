@@ -1,6 +1,6 @@
 ---
 id: cod-12yk
-status: open
+status: closed
 deps: []
 links: [cod-451g, cod-btfg]
 created: 2026-07-15T03:40:57Z
@@ -134,3 +134,9 @@ docs/cli-design.md                         update if it pins the print-log-comma
   the new `all` flag)
 - Skills: `/golang`, `/tdd`, `/llm-coding` (surgical: only the two default changes
   plus one opt-in flag)
+
+## Notes
+
+**2026-07-15T04:22:54Z**
+
+Dropped --all from the default print-log-command and added --use-mailmap unconditionally; added an opt-in --all bool flag (inserts --all right after 'git log'). --after validation/append unchanged and composes with --all. Wired the flag via the existing metaCommand descriptor so schema --command print-log-command surfaces both after and all. TDD: rewrote printlogcommand_test.go (default omits --all + has --use-mailmap, --all flag, after-still-works, --all+--after, bad-after unchanged) and extended metacommands_test.go to assert the all flag. Docs updated: operating.md (canonical workflow line, --all note, .mailmap -> --team-map alias ladder), catalog.md (Knowledge map + Communication network alias guidance), cli-design.md section 5. make build green; markdownlint clean.

@@ -4,3 +4,4 @@ bin/
 dist/
 *.bak
 *.bak.*
+**/__pycache__

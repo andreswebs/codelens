@@ -53,7 +53,7 @@ projection, and a `schema` introspection command.
 codelens <analysis> [flags]      # run one analysis, read log from stdin
 codelens schema [--command CMD]  # machine-readable introspection
 codelens print-log-command       # emit the git log command to generate input
-codelens version                 # version (also --version)
+codelens --version               # print the bare build version
 codelens --help / <cmd> --help   # human help
 ```
 
@@ -92,6 +92,8 @@ for code-maat's "global flag that no-ops for 19 of 20 analyses" problem.
 | `--format FMT`          | `json`  | `json` \| `ndjson` \| `csv` \| `table`            |
 | `--fields PATHS`        | (all)   | Comma-separated JSON field projection             |
 | `--rows N`              | (all)   | Cap output rows after sorting                     |
+| `--include GLOB`        | -       | Keep only entities matching GLOB (repeatable)     |
+| `--exclude GLOB`        | -       | Drop entities matching GLOB (repeatable)          |
 | `--group FILE`          | -       | Layer-mapping file                                |
 | `--group-format FMT`    | `text`  | `text` (`=>` lines) or `json`                     |
 | `--team-map FILE`       | -       | author→team map                                   |
@@ -101,6 +103,16 @@ for code-maat's "global flag that no-ops for 19 of 20 analyses" problem.
 
 Format for `--group`/`--team-map` is chosen by an **explicit** `*-format` flag
 (no content sniffing or extension guessing), defaulting to the text/CSV form.
+
+`--include`/`--exclude` are repeatable gitignore-style path globs (`**`
+supported, matched against the full entity path via
+`github.com/bmatcuk/doublestar/v4`). They are a pipeline transform that runs
+**first**, before grouping, so globs match raw file paths (`**/Migrations/**`),
+not the layer names grouping produces. Precedence is exclude-after-include: with
+any `--include`, an entity must match at least one include to survive, then any
+`--exclude` drops it; with no includes, all are included and only excludes apply.
+A malformed glob is a usage error (exit 2). `*`/`?` do not cross `/`; use `**` to
+span directories. The pipeline order is `filter -> group -> temporal -> team-map`.
 
 ### 4.3 Per-analysis flags
 
@@ -125,8 +137,8 @@ reference doc §6); the schema output is the source of truth per command.
 - **Default: stdin.** The canonical workflow is a pipe:
 
   ```sh
-  git log --all --numstat --date=short \
-    --pretty=format:'--%h--%ad--%aN--%s' --no-renames --after=2024-01-01 \
+  git log --numstat --date=short \
+    --pretty=format:'--%h--%ad--%aN--%s' --no-renames --use-mailmap --after=2024-01-01 \
     | codelens coupling
   ```
 
@@ -135,15 +147,20 @@ reference doc §6); the schema output is the source of truth per command.
   so the `messages` analysis works on the single supported format. The 3-field
   stock git2 log is still accepted (message defaults to `-`). See reference doc
   §3.
-- `codelens print-log-command` prints exactly the command above (no arguments),
-  so neither a human nor an agent has to memorize the format - this is the
-  single biggest friction-killer versus the original.
+- The default reads the current branch's history and applies `.mailmap`
+  (`--use-mailmap`, collapsing author aliases). `print-log-command --all` opts
+  into all-refs history when cross-branch coverage is wanted.
+- `codelens print-log-command` prints exactly the command above (minus the
+  illustrative `--after`), so neither a human nor an agent has to memorize the
+  format - this is the single biggest friction-killer versus the original.
 
 ### 5.1 Input safety
 
 - **Bounded regexes.** `--expression` and grouping patterns are compiled with a
   size/complexity guard; an invalid or oversized pattern is a usage error (exit
-  2), never an unbounded match or hang.
+  2), never an unbounded match or hang. `--include`/`--exclude` globs are
+  length-bounded and validated the same way, and doublestar's matcher is
+  backtracking-safe.
 - **Control characters.** Log/definition content containing disallowed control
   characters (e.g. NUL) is an input error (exit 3).
 - **Read-only.** All input files are opened read-only; results go only to
@@ -246,7 +263,31 @@ mirrors `terminology`:
 }
 ```
 
-`--format text` renders `✗ <message>` + `hint:` lines instead (also stderr).
+Errors are **always** emitted as this JSON envelope on stderr, for every
+`--format` value including `text` and `table`: `--format` governs the results on
+stdout, not diagnostics on stderr. There is no human-facing `✗ <message>` text
+error path; a `text`/`table` caller reads the envelope's `message` and `hint`
+fields directly.
+
+### 7.1a Warning diagnostics (stderr)
+
+Non-fatal advisories are emitted as a single-line JSON diagnostic on stderr,
+distinct from the error envelope by a `level` field (and the absence of `ok`):
+
+```json
+{
+  "schema_version": 1,
+  "level": "warning",
+  "code": "empty_result_at_thresholds",
+  "message": "grouped coupling returned no rows at the default thresholds",
+  "hint": "lower --min-coupling or --min-shared-revs",
+  "details": { "min_coupling": 30, "min_shared_revs": 5 }
+}
+```
+
+One diagnostic is emitted per line, so multiple warnings form a valid NDJSON
+stream on stderr. A warning never changes the exit code and never appears on
+stdout; `hint` and `details` are omitted when empty.
 
 ### 7.2 Exit codes
 
@@ -307,10 +348,11 @@ piece: a small per-analysis table of `{name, type, desc}` so column meanings are
 machine-readable, closing the "columns documented only in prose" gap. The
 `schema` command is what lets an agent learn a command entirely at runtime.
 
-`CMD` covers the meta commands too: `schema --command schema|version|print-log-command`
+`CMD` covers the meta commands too: `schema --command schema|print-log-command`
 returns each helper's contract (flags, error/exit codes) so nothing the binary
 exposes is off the introspection path. Helpers take no log and emit no rows, so
-their `aliases` and `row_schema` are empty.
+their `aliases` and `row_schema` are empty. The build version is the `--version`
+flag (bare output), not a subcommand, so it is not on the `schema` path.
 
 ## 9. Architecture
 
@@ -322,8 +364,9 @@ internal/
   output/                envelope build, EmitJSON/NDJSON/CSV/Table, fields, registry, schema
   gitlog/                git2(+subject) tokenizer + parser -> []Modification
   model/                 Modification, ChangeSet types
-  pipeline/              parse -> group -> temporal -> team-map orchestration
+  pipeline/              parse -> filter -> group -> temporal -> team-map orchestration
   transform/
+    filter/              path include/exclude globs (doublestar), runs first
     group/               layer mapping (text `=>` + JSON), anchoring rules
     temporal/            sliding-window day grouping
     teammap/             author->team (CSV + JSON)
@@ -362,7 +405,7 @@ Design points:
 | --------------------------------- | --------------------------------------------------------------------------- |
 | Errors/traces on stdout           | All diagnostics on stderr; stdout is results only                           |
 | Stack traces leaked to users      | Traces only under `--debug`; otherwise one-line coded error                 |
-| No `--version`                    | `codelens version` + `--version` from build info                            |
+| No `--version`                    | `codelens --version` prints the bare build version                          |
 | Opaque `is it a valid logfile?`   | Named `parse_error` with entry/line `details` + hint to `print-log-command` |
 | Input contract undiscoverable     | `codelens print-log-command` emits the exact git command                    |
 | `--verbose-results` no-ops 19/20  | `--verbose` lives only on `coupling`                                        |

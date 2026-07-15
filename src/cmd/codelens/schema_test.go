@@ -61,7 +61,7 @@ func TestSchema_List(t *testing.T) {
 	for _, c := range list.Commands {
 		byName[c.Name]++
 	}
-	for _, name := range []string{"authors", "schema", "print-log-command", "version"} {
+	for _, name := range []string{"authors", "schema", "print-log-command"} {
 		if byName[name] == 0 {
 			t.Errorf("command %q missing from schema list", name)
 		}

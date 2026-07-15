@@ -1,6 +1,6 @@
 ---
 id: cod-5t5t
-status: open
+status: closed
 deps: []
 links: [cod-451g]
 created: 2026-07-15T03:40:57Z
@@ -118,3 +118,9 @@ docs/cli-design.md                       update if it documents the version subc
 - `internal/version/version.go` (`Current()`)
 - Related: `cod-451g` (meta-command spine)
 - Skills: `/golang` (urfave idioms), `/tdd`, `/llm-coding` (surgical deletion)
+
+## Notes
+
+**2026-07-15T04:31:31Z**
+
+Dropped the version subcommand; --version now prints the bare version string. Set a package-level cli.VersionPrinter in an init() in main.go to write cmd.Root().Version (bare) to cmd.Root().Writer, replacing urfave's 'codelens version <v>' template. Removed the version entry from metaCommands(), deleted version_cmd.go (versionAction) and the versionUsage const in schema.go. version.Current() stays the single source. Behavior: 'codelens version' is now unknown_command exit 2; schema no longer lists version; 'schema --command version' is a usage error. Tests: deleted duplicate version_cmd_test.go, strengthened the flag test in main_test.go to pin exact bare output (+newline), added TestRun_VersionSubcommand_UnknownExit2, dropped TestSchema_Command_Version, removed 'version' from the schema-list check. The schemacodes_test.go conformance guard iterates metaCommands() so it adjusted automatically (no fixed meta count). Docs updated: cli-design.md command surface + audit table + meta-schema note, operating.md helper mentions. make build green; markdownlint clean (repo-local .markdownlint.yaml).

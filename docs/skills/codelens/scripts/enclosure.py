@@ -24,17 +24,108 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, Callable, NoReturn, cast
 
 EXIT_USAGE = 2
 EXIT_EMPTY = 3
+
+MAX_GLOB_LEN = 1000
+
+# Sentinel category for a file present in the tokei structure but absent from the
+# categorical weights (e.g. a file with no recorded author in the window). The
+# template renders it in neutral grey, distinct from every real category color.
+UNOWNED_CATEGORY = "(unowned)"
 
 
 def die(msg: str, code: int) -> NoReturn:
     print(f"enclosure.py: {msg}", file=sys.stderr)
     raise SystemExit(code)
+
+
+def glob_to_regex(pattern: str) -> str:
+    """Translate a gitignore-style glob to an anchored regex.
+
+    Semantics match the codelens Go side (github.com/bmatcuk/doublestar), matched
+    against the full entity path, so one shared glob set behaves identically in
+    both surfaces:
+      **  matches any run of characters, including path separators;
+      *   matches any run of non-separator characters;
+      ?   matches a single non-separator character;
+      [.] a character class (leading ! or ^ negates).
+    A malformed class raises ValueError so the caller can report a usage error.
+    """
+    i, n = 0, len(pattern)
+    out = ["(?s:"]
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            i += 1
+            if i < n and pattern[i] == "*":  # ** crosses separators
+                i += 1
+                if i < n and pattern[i] == "/":  # **/ matches zero or more dirs
+                    out.append("(?:.*/)?")
+                    i += 1
+                else:
+                    out.append(".*")
+            else:
+                out.append("[^/]*")
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        elif c == "[":
+            j = i + 1
+            if j < n and pattern[j] in ("!", "^"):
+                j += 1
+            if j < n and pattern[j] == "]":
+                j += 1
+            while j < n and pattern[j] != "]":
+                j += 1
+            if j >= n:
+                raise ValueError(f"unterminated character class in {pattern!r}")
+            body = pattern[i + 1 : j]
+            i = j + 1
+            if body.startswith(("!", "^")):
+                body = "^" + body[1:]
+            out.append("[" + body.replace("\\", "\\\\") + "]")
+        else:
+            out.append(re.escape(c))
+            i += 1
+    out.append(r")\Z")
+    return "".join(out)
+
+
+def compile_globs(patterns: list[str]) -> list[re.Pattern[str]]:
+    """Validate and compile globs; a malformed glob is a usage error (exit 2)."""
+    compiled: list[re.Pattern[str]] = []
+    for p in patterns:
+        if not p:
+            die("empty --include/--exclude glob", EXIT_USAGE)
+        if len(p) > MAX_GLOB_LEN:
+            die(f"glob exceeds {MAX_GLOB_LEN} chars", EXIT_USAGE)
+        try:
+            compiled.append(re.compile(glob_to_regex(p)))
+        except (ValueError, re.error) as e:
+            die(f"invalid glob {p!r}: {e}", EXIT_USAGE)
+    return compiled
+
+
+def make_path_filter(
+    includes: list[str], excludes: list[str]
+) -> Callable[[str], bool]:
+    """Build an exclude-after-include predicate over normalized paths: if any
+    include is given a path must match one, then any exclude match drops it."""
+    inc = compile_globs(includes)
+    exc = compile_globs(excludes)
+
+    def keep(path: str) -> bool:
+        if inc and not any(r.match(path) for r in inc):
+            return False
+        return not any(r.match(path) for r in exc)
+
+    return keep
 
 
 def norm_path(p: str) -> str:
@@ -133,6 +224,8 @@ def main() -> None:
     ap.add_argument("--invert", action="store_true", help="invert numeric weight (low = hot, e.g. age)")
     ap.add_argument("--root-name", default="root")
     ap.add_argument("--path-prefix", default="", help="strip this prefix from tokei/weight paths")
+    ap.add_argument("--include", action="append", metavar="GLOB", help="keep only paths matching GLOB (gitignore-style, repeatable; exclude wins)")
+    ap.add_argument("--exclude", action="append", metavar="GLOB", help="drop paths matching GLOB (gitignore-style, repeatable; applied after --include)")
     ap.add_argument("--template", default=None, help="HTML template (default: assets/templates/circle-packing.html.jinja)")
     ap.add_argument("--vendor-d3", default=None, help="path to a vendored d3 bundle to inline")
     ap.add_argument("-o", "--out", required=True, help="output HTML file")
@@ -151,9 +244,36 @@ def main() -> None:
 
     weights = strip_prefix(weights)
 
+    # Filter both the weights and (below) the tokei structure with one shared
+    # glob set, before build_tree, so an excluded generated file is drawn on no
+    # map: codelens cannot see the external structure, so the filter must be
+    # reapplied here to the same node set.
+    keep = make_path_filter(args.include or [], args.exclude or [])
+    weights = {p: v for p, v in weights.items() if keep(p)}
+
+    # When --structure is given, the tokei node set is authoritative for every
+    # mode, so all three maps (hotspot, code-age, knowledge) draw the same files.
+    # Without it, every mode degrades to the weights as the node set.
+    sizes: dict[str, int] = {}
+    if args.structure:
+        sizes = strip_prefix(read_structure(load_json(args.structure)))
+        if not sizes:
+            die("tokei structure has no files", EXIT_EMPTY)
+        sizes = {p: v for p, v in sizes.items() if keep(p)}
+
+    # The effective node set is the structure (full mode) or the weights
+    # (degraded mode); filtering can empty it, which is an empty result (exit 3).
+    if not (sizes if args.structure else weights):
+        die("no files remain after --include/--exclude filtering", EXIT_EMPTY)
+
     if args.categorical:
-        # Categorical map: node set = weight source, uniform size, category on leaf.
-        leaves = {p: {"size": 1, "category": v} for p, v in weights.items()}
+        if sizes:  # full mode: node set = structure, radius = LOC, category joined
+            leaves = {
+                p: {"size": loc, "category": weights.get(p, UNOWNED_CATEGORY)}
+                for p, loc in sizes.items()
+            }
+        else:  # degraded mode: node set = weights, uniform size
+            leaves = {p: {"size": 1, "category": v} for p, v in weights.items()}
     else:
         numeric = {p: float(v) for p, v in weights.items()}
         hi = max(numeric.values())
@@ -164,15 +284,17 @@ def main() -> None:
             frac = (v - lo) / span
             return 1.0 - frac if args.invert else frac
 
-        if args.structure:  # full mode
-            sizes = strip_prefix(read_structure(load_json(args.structure)))
-            if not sizes:
-                die("tokei structure has no files", EXIT_EMPTY)
+        if sizes:  # full mode: node set = structure
+            # A file absent from the weights renders at the neutral (cold) end,
+            # not lo-as-if-present, so --invert maps never draw unchanged files hot.
             leaves = {
-                p: {"size": loc, "weight": round(norm(numeric.get(p, lo)), 4)}
+                p: {
+                    "size": loc,
+                    "weight": round(norm(numeric[p]), 4) if p in numeric else 0.0,
+                }
                 for p, loc in sizes.items()
             }
-        else:  # degraded mode
+        else:  # degraded mode: node set = weights
             leaves = {
                 p: {"size": max(v, 1), "weight": round(norm(v), 4)}
                 for p, v in numeric.items()

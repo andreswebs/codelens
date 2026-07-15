@@ -9,8 +9,49 @@ import (
 	"github.com/andreswebs/codelens/internal/model"
 	"github.com/andreswebs/codelens/internal/pipeline"
 	"github.com/andreswebs/codelens/internal/terr"
+	"github.com/andreswebs/codelens/internal/transform/filter"
 	"github.com/andreswebs/codelens/internal/transform/group"
 )
+
+// mustFilter compiles include/exclude globs or fails the test.
+func mustFilter(t *testing.T, includes, excludes []string) filter.Spec {
+	t.Helper()
+	spec, err := filter.Compile(includes, excludes)
+	if err != nil {
+		t.Fatalf("filter.Compile(%v, %v) returned error: %v", includes, excludes, err)
+	}
+	return spec
+}
+
+// TestPipeline_FilterBeforeGroup proves the filter stage runs before grouping:
+// a glob dropping `**/Migrations/**` removes those files while they still carry
+// raw paths, so the layer they would have grouped into never sees them. Both
+// files would otherwise group to SrcLayer, so filtering afterward could not
+// distinguish them.
+func TestPipeline_FilterBeforeGroup(t *testing.T) {
+	mods := []model.Modification{
+		{Entity: "src/app.go", Rev: "r1", Date: "2024-01-01", Author: "Alice"},
+		{Entity: "src/Migrations/0001.go", Rev: "r2", Date: "2024-01-02", Author: "Bob"},
+	}
+	cfg := pipeline.Config{
+		FilterSpec: mustFilter(t, nil, []string{"**/Migrations/**"}),
+		GroupSpecs: mustSpecs(t, "src => SrcLayer"),
+	}
+
+	got, err := pipeline.Apply(mods, cfg)
+	if err != nil {
+		t.Fatalf("Apply returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1 (Migrations file filtered before grouping)", len(got))
+	}
+	if got[0].Entity != "SrcLayer" {
+		t.Errorf("entity = %q, want SrcLayer", got[0].Entity)
+	}
+	if got[0].Rev != "r1" {
+		t.Errorf("rev = %q, want r1 (the non-Migrations change)", got[0].Rev)
+	}
+}
 
 // mustSpecs compiles a text-form grouping definition or fails the test.
 func mustSpecs(t *testing.T, def string) []group.Spec {

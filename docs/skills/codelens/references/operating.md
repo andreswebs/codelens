@@ -19,8 +19,25 @@ codelens <analysis> --log git.log > result.json      # stdin is the default inpu
 ```
 
 `print-log-command` emits the required `git log` (`--numstat`, four fields
-`%h %ad %aN %s`, `--no-renames`). The trailing `%s` subject is what powers the
-`messages` analysis and the word cloud; 3-field logs still parse (subject `-`).
+`%h %ad %aN %s`, `--no-renames`, `--use-mailmap`). The trailing `%s` subject is
+what powers the `messages` analysis and the word cloud; 3-field logs still parse
+(subject `-`).
+
+The default reads the checked-out branch's history, matching code-maat and
+avoiding commits from unmerged branches or dated after `HEAD`. Pass
+`print-log-command --all` for cross-branch history (all refs), at the cost of
+merge- and branch-tip noise.
+
+### Resolving author aliases
+
+When one person commits under several names, ownership and communication maps
+inflate. Resolve aliases in this order:
+
+1. Zero-config: the emitted log uses `--use-mailmap`, so a repo `.mailmap`
+   collapses aliases automatically. This is the recommended first step and a safe
+   no-op when the repo has no `.mailmap`.
+2. Escalation: when there is no `.mailmap`, or a team-level rollup is wanted, use
+   `--team-map` to map authors (or aliases) to canonical identities or teams.
 
 ## Discover a command at runtime
 
@@ -33,9 +50,10 @@ codelens schema --command coupling  # summary, flags, row_schema, error_codes, e
 
 `schema --command` is authoritative, including columns that appear only with
 `--verbose`. It also describes the helper commands themselves
-(`schema --command print-log-command`, `schema --command schema`,
-`schema --command version`), so their flags and exit codes are discoverable at
-runtime like any analysis; helpers carry no `row_schema`.
+(`schema --command print-log-command`, `schema --command schema`), so their
+flags and exit codes are discoverable at runtime like any analysis; helpers
+carry no `row_schema`. The build version is the `--version` flag (bare output),
+not a subcommand.
 
 ## Analyses
 
@@ -60,7 +78,8 @@ runtime like any analysis; helpers carry no `row_schema`.
 | `messages`                    |                        | entity frequency for a commit-message regex (`--expression`) |
 | `parse`                       | `identity`             | dump parsed records in log order (debug/interop)             |
 
-Helpers: `print-log-command`, `schema`, `version`.
+Helpers: `print-log-command`, `schema`. The build version is printed by the
+`--version` flag (bare version string), not a subcommand.
 
 ## Output formats and shaping
 
@@ -84,12 +103,25 @@ run is self-documenting: `coupling`, `sum-of-coupling`, `code-age`, and
 
 ## Pipeline transforms
 
-Global flags that reshape the input before analysis:
+Global flags that reshape the input before analysis. They run in a fixed order,
+`filter -> group -> temporal -> team-map`, each a no-op when its flag is absent:
 
+- `--include GLOB` / `--exclude GLOB` (both repeatable): keep or drop entities by
+  gitignore-style path glob (`**` supported), matched against the full entity
+  path. Precedence is exclude-after-include: with any `--include`, an entity must
+  match at least one include to survive, then any `--exclude` match drops it; with
+  no includes, all entities are included and only excludes apply. Filtering runs
+  first, before grouping, so globs match raw file paths (`**/Migrations/**`), not
+  layer names. A malformed glob is a usage error (exit 2). Note `*` and `?` do not
+  cross `/`; use `**` to span directories.
 - `--group FILE` (`--group-format text|json`): map files to architectural layers.
   Text lines are `pattern => name`; unanchored patterns are path-prefix matches,
   anchored (`^...`) are full expressions; unmatched files are dropped. Use to run
-  any analysis at the component level.
+  any analysis at the component level. Grouping `coupling` to components dilutes
+  per-pair degrees, so the default `--min-coupling 30` may filter everything and
+  return an empty result; lower `--min-coupling` (around 5). When every candidate
+  pair is filtered, codelens warns on stderr (`coupling_all_filtered`) with the
+  highest degree it observed.
 - `--team-map FILE` (`--team-map-format csv|json`): map authors to teams
   (`author,team`); unmapped authors pass through. Resolve author aliases with a
   repo `.mailmap` first. Feeds the communication network's Conway view.
@@ -97,16 +129,47 @@ Global flags that reshape the input before analysis:
   analysis. Intended for coupling, where per-commit granularity is too narrow
   across teams working in days or weeks.
 
+## Authored-only run
+
+On a real monorepo, hotspot and coupling analyses are dominated by
+machine-generated files (migration snapshots, generated localization, designer
+files, lock files). Exclude them with one shared glob set passed to both the
+`codelens` analysis and the enclosure map, so the weights and the drawn structure
+agree:
+
+```sh
+GENERATED='--exclude **/Migrations/** --exclude **/*.g.dart
+  --exclude **/*.Designer.cs --exclude **/*.lock --exclude **/package-lock.json'
+
+git log --numstat --date=short \
+  --pretty=format:'--%h--%ad--%aN--%s' --no-renames --use-mailmap \
+  | codelens revisions $GENERATED > revisions.json
+
+python3 enclosure.py --weights revisions.json --weight-col n_revs \
+  --structure tokei.json $GENERATED -o hotspots.html
+```
+
+Exclude only truly generated artifacts. Config (`appsettings*.json`, `*.yml`) and
+localization sources (`*.arb`, `*.resx`) are human-authored and should not be
+excluded by default.
+
 ## Analysis period
 
 Scope the git log by date (`--after=` on the log command). Heuristics: one year is
 a good default; a month for very high-churn repos; a window around a major event
 (reorg, redesign) to measure its impact. Too much history buries recent trends.
 
+The one exception is `code-age`: run it against full history, not a window scoped
+with `--after`. Age is measured from the log's earliest commit, so a scoped window
+caps every file's reported age at the window length.
+
 ## Errors and exit codes
 
-Errors are a JSON envelope on stderr (`{ok: false, error: {code, message,
-hint}}`); `--format text` renders `✗ <message>` plus a `hint:` line instead.
+Errors are **always** a JSON envelope on stderr (`{ok: false, error: {code,
+message, hint}}`), for every `--format` value including `text` and `table`.
+`--format` selects the results shape on stdout, not the diagnostics on stderr;
+there is no `✗ <message>` text error path, so parse the envelope's `message` and
+`hint` fields directly.
 
 | Exit | Meaning               | Examples                                                              |
 | ---- | --------------------- | --------------------------------------------------------------------- |
@@ -114,3 +177,9 @@ hint}}`); `--format text` renders `✗ <message>` plus a `hint:` line instead.
 | 2    | usage error           | unknown flag/subcommand, bad value, `messages` without `--expression` |
 | 3    | input error           | empty or unparseable log, malformed `--group`/`--team-map`            |
 | 1    | internal              | a bug; prints a trace only under `--debug`                            |
+
+Non-fatal advisories are emitted as single-line JSON **warning** diagnostics on
+stderr, distinguished from errors by `level: "warning"` (and no `ok` field):
+`{schema_version, level: "warning", code, message, hint?, details?}`. One per
+line (valid NDJSON), they never change the exit code and never touch stdout, so a
+consumer reading results from stdout is unaffected.

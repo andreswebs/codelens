@@ -69,6 +69,26 @@ type Opts struct {
 	// Expression is the regular expression the messages analysis matches
 	// against commit subjects.
 	Expression string
+	// Warn is an optional sink for non-fatal advisories. An analysis calls it
+	// (via the nil-safe warn helper) to raise a machine-readable warning without
+	// depending on the output layer or knowing about stderr; the action layer
+	// wires it to output.EmitWarning. A nil Warn discards the advisory, so the
+	// zero-value Opts is usable without a guard at each call site.
+	Warn WarnFunc
+}
+
+// WarnFunc reports one non-fatal advisory. Its signature mirrors
+// output.EmitWarning's payload (code, message, hint, details) so the action
+// layer can adapt it to that emitter without analysis importing output. A
+// warning never alters the exit code.
+type WarnFunc func(code, message, hint string, details any)
+
+// warn forwards a non-fatal advisory to o.Warn when a sink is set, and is a
+// no-op otherwise, so analyses can raise warnings unconditionally.
+func (o Opts) warn(code, message, hint string, details any) {
+	if o.Warn != nil {
+		o.Warn(code, message, hint, details)
+	}
 }
 
 // Descriptor is the registered contract for one analysis: its identity, the

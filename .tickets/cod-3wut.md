@@ -1,6 +1,6 @@
 ---
 id: cod-3wut
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-15T03:40:57Z
@@ -79,3 +79,9 @@ warning, so the resulting code-age map looks uniformly young and is misread.
 - `docs/skills/codelens/SKILL.md` (step 4, output formats)
 - `docs/skills/codelens/references/catalog.md` (static-script cards, code-age card)
 - `docs/skills/codelens/references/operating.md` (analysis-period heuristics)
+
+## Notes
+
+**2026-07-15T04:33:28Z**
+
+Docs-only. SKILL.md step 4 static bullet: each script writes one file, -o extension picks .svg or .png, run twice for both. catalog.md: all 5 static-script Formats lines changed to 'SVG or PNG (the -o extension picks the format)'; added a 'Full history required' caveat to the Code-age map card. operating.md Analysis period: noted code-age is the exception to --after scoping (age measured from earliest commit, window caps reported age). markdownlint-cli2 auto-discovered repo-local /workspace/.markdownlint.yaml (ticket assumed none) -> 0 errors. make build green.

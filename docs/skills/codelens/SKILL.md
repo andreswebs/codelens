@@ -77,7 +77,9 @@ uv run scripts/enclosure.py --weights data.json --structure tokei.json -o hotspo
 ### 4. Render the requested formats
 
 - **Static** (churn, fractal, word cloud, complexity trend, summary): the script
-  writes SVG and PNG directly. Use these for slides and PDF.
+  writes one file, and the `-o` extension picks the format (`.svg` or `.png`),
+  never both in one run; run the script twice to get both. Use these for slides
+  and PDF.
 - **Interactive** (enclosure, coupling, network): the script writes an `.html`
   file (D3 from a CDN, data inlined) for live viewing and iframe embedding. These
   are not exported to static images.

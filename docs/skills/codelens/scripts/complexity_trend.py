@@ -22,11 +22,14 @@ Exit codes: 0 ok; 2 usage; 3 no history for the file.
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 TAB = 8  # spaces-per-tab when expanding leading whitespace
+
+_HASH = re.compile(r"\A[0-9a-f]{40}\Z")
 
 
 def git(repo: str, *args: str) -> str:
@@ -35,6 +38,37 @@ def git(repo: str, *args: str) -> str:
         print(f"complexity_trend.py: git {' '.join(args)}: {r.stderr.strip()}", file=sys.stderr)
         raise SystemExit(2)
     return r.stdout
+
+
+def enumerate_revs(repo: str, file: str, rng: str) -> list[tuple[str, str, str]]:
+    """Return (rev, date, path_at_rev) oldest-first across the file's whole life.
+
+    `--follow` yields commits from before the file reached its current path, so
+    each revision must be fetched at the path it carried *then*. `--name-status`
+    surfaces that path per commit: a rename is `R<score>\\t<old>\\t<new>` (the new
+    side is the path this commit produced), everything else is `<status>\\t<path>`.
+    """
+    log = git(repo, "log", "--follow", "--name-status",
+              "--format=%H\t%ad", "--date=short", rng, "--", file)
+    revs: list[tuple[str, str, str]] = []
+    rev: str | None = None
+    date = ""
+    path: str | None = None
+    for line in log.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) == 2 and _HASH.match(parts[0]):
+            if rev is not None and path is not None:
+                revs.append((rev, date, path))
+            rev, date = parts
+            path = None
+        elif path is None:  # first status line of the current commit
+            path = parts[2] if parts[0][:1] in ("R", "C") else parts[1]
+    if rev is not None and path is not None:
+        revs.append((rev, date, path))
+    revs.reverse()  # oldest first
+    return revs
 
 
 def indentation(source: str) -> tuple[int, float]:
@@ -62,10 +96,7 @@ def main() -> None:
     args = ap.parse_args()
 
     rng = f"{args.start}..{args.end}" if args.start else args.end
-    log = git(args.repo, "log", "--follow", "--format=%H\t%ad", "--date=short",
-              rng, "--", args.file)
-    revs = [tuple(line.split("\t")) for line in log.splitlines() if line]
-    revs.reverse()  # oldest first
+    revs = enumerate_revs(args.repo, args.file, rng)
     if not revs:
         print(f"complexity_trend.py: no history for {args.file}", file=sys.stderr)
         raise SystemExit(3)
@@ -73,8 +104,8 @@ def main() -> None:
     dates: list[str] = []
     totals: list[float] = []
     locs: list[int] = []
-    for rev, date in revs:
-        src = git(args.repo, "show", f"{rev}:{args.file}")
+    for rev, date, path in revs:
+        src = git(args.repo, "show", f"{rev}:{path}")
         n, total = indentation(src)
         dates.append(date)
         totals.append(round(total, 2))

@@ -73,7 +73,19 @@
       const data = {{DATA}};
 
       const width = 900, height = 900;
+      // Numeric maps (hotspot, code-age) color leaves by a 0..1 weight; categorical
+      // maps (knowledge) color by an ordinal per-category scale, with the reserved
+      // "(unowned)" sentinel drawn neutral grey so it reads distinct from every dev.
       const color = d3.scaleSequential([0, 1], d3.interpolateYlOrRd);
+      const UNOWNED = "(unowned)";
+      const NEUTRAL = "#5a6270";
+      const catColor = d3.scaleOrdinal(d3.schemeTableau10);
+
+      function leafFill(d) {
+        if (d.data.category != null)
+          return d.data.category === UNOWNED ? NEUTRAL : catColor(d.data.category);
+        return color(d.data.weight ?? 0);
+      }
 
       const pack = d3.pack().size([width, height]).padding(3);
       const root = pack(d3.hierarchy(data).sum(d => d.size || 0).sort((a, b) => b.value - a.value));
@@ -89,7 +101,7 @@
       const node = svg.append("g").selectAll("circle")
         .data(root.descendants().slice(1))
         .join("circle")
-          .attr("fill", d => d.children ? "#2a2f3a" : color(d.data.weight ?? 0))
+          .attr("fill", d => d.children ? "#2a2f3a" : leafFill(d))
           .attr("stroke", d => d.children ? "#3a4150" : "none")
           .attr("pointer-events", d => !d.children ? "all" : null)
           .on("mouseover", (e, d) => {

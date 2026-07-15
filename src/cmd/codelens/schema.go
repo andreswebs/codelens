@@ -13,11 +13,6 @@ import (
 // entry in the command list so the list stays complete and self-describing.
 const schemaUsage = "describe commands and their I/O contract (machine-readable)"
 
-// versionUsage is the one-line summary of the version command, reused for its
-// entry in the schema command list (via the meta table) so the list and the
-// wired subcommand cannot drift.
-const versionUsage = "print the codelens build version"
-
 // errUnknownSchemaCommand marks a --command value that names no known analysis.
 // It is a usage error (exit 2) and carries the resolvable command names in its
 // details so a caller can recover without a second round trip.

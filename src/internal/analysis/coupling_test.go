@@ -233,3 +233,129 @@ func TestCoupling_DescriptorRegistered(t *testing.T) {
 		t.Error("Run is nil")
 	}
 }
+
+// recordedWarn captures one warning raised through the Opts.Warn sink so tests
+// can assert an analysis emitted exactly the advisory expected.
+type recordedWarn struct {
+	code    string
+	message string
+	hint    string
+	details any
+}
+
+// recordingSink returns a WarnFunc that appends each advisory to *out, for
+// asserting whether (and what) an analysis warned.
+func recordingSink(out *[]recordedWarn) WarnFunc {
+	return func(code, message, hint string, details any) {
+		*out = append(*out, recordedWarn{code, message, hint, details})
+	}
+}
+
+// weaklyCoupled builds a log where a and b co-change in shared revisions and
+// each also changes alone in `alone` further revisions, so their coupling
+// degree is a chosen weak value (shared / average * 100). Revs are namespaced by
+// prefix so disjoint pairs never collide.
+func weaklyCoupled(prefix, a, b string, shared, alone int) []model.Modification {
+	mods := make([]model.Modification, 0, shared*2+alone*2)
+	for i := 1; i <= shared; i++ {
+		rev := prefix + "s" + string(rune('0'+i))
+		mods = append(mods, cmod(a, rev), cmod(b, rev))
+	}
+	for i := 1; i <= alone; i++ {
+		mods = append(mods, cmod(a, prefix+"a"+string(rune('0'+i))))
+		mods = append(mods, cmod(b, prefix+"b"+string(rune('0'+i))))
+	}
+	return mods
+}
+
+// TestCoupling_WarnsWhenAllFiltered: a real but weak pair (degree 20%) run at the
+// default min-coupling 30 yields no rows and exactly one coupling_all_filtered
+// warning naming the highest observed degree and the effective threshold.
+func TestCoupling_WarnsWhenAllFiltered(t *testing.T) {
+	// shared 5, alone 5 -> entityRevs = coupledRevs = 10, average = 10,
+	// degree = 5/10 = 50%. To land on 20%: shared 2, alone 8 gives revs 10 each,
+	// average 10, degree 2/10 = 20% -- but shared 2 < min-shared-revs, still a
+	// candidate. Keep shared at the threshold and dilute via alone instead.
+	mods := weaklyCoupled("p", "A", "B", 5, 20) // average 25, degree 5/25 = 20%
+
+	var warns []recordedWarn
+	opts := couplingOpts()
+	opts.Warn = recordingSink(&warns)
+
+	rows := couplingResultRows(t, mods, opts)
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want empty (all filtered)", rows)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("warnings = %d, want 1: %+v", len(warns), warns)
+	}
+	w := warns[0]
+	if w.code != "coupling_all_filtered" {
+		t.Errorf("code = %q, want coupling_all_filtered", w.code)
+	}
+	d, ok := w.details.(map[string]any)
+	if !ok {
+		t.Fatalf("details is %T, want map[string]any", w.details)
+	}
+	if d["max_degree"] != 20 {
+		t.Errorf("details.max_degree = %v, want 20", d["max_degree"])
+	}
+	if d["min_coupling"] != 30 {
+		t.Errorf("details.min_coupling = %v, want 30", d["min_coupling"])
+	}
+}
+
+// TestCoupling_NoWarnWhenRowsPresent: the same weak pair at a low min-coupling
+// clears the thresholds, so rows are present and no advisory is raised.
+func TestCoupling_NoWarnWhenRowsPresent(t *testing.T) {
+	mods := weaklyCoupled("p", "A", "B", 5, 20) // degree 20%
+
+	var warns []recordedWarn
+	opts := couplingOpts()
+	opts.MinCoupling = 10
+	opts.Warn = recordingSink(&warns)
+
+	rows := couplingResultRows(t, mods, opts)
+	if len(rows) == 0 {
+		t.Fatal("rows empty, want at least one at min-coupling 10")
+	}
+	if len(warns) != 0 {
+		t.Errorf("warnings = %d, want 0: %+v", len(warns), warns)
+	}
+}
+
+// TestCoupling_NoWarnWhenNoPairs: entities that never co-change produce no
+// candidate pairs, which is a genuine absence of coupling, not a threshold trap;
+// no advisory is raised (distinct from all-filtered).
+func TestCoupling_NoWarnWhenNoPairs(t *testing.T) {
+	mods := []model.Modification{
+		cmod("A", "r1"), cmod("A", "r2"),
+		cmod("B", "r3"), cmod("B", "r4"),
+	}
+
+	var warns []recordedWarn
+	opts := couplingOpts()
+	opts.Warn = recordingSink(&warns)
+
+	rows := couplingResultRows(t, mods, opts)
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want empty", rows)
+	}
+	if len(warns) != 0 {
+		t.Errorf("warnings = %d, want 0 (no candidate pairs): %+v", len(warns), warns)
+	}
+}
+
+// TestCoupling_NilSinkSafe: an all-filtered run with no warning sink set does not
+// panic and still returns the empty result (library-use safety).
+func TestCoupling_NilSinkSafe(t *testing.T) {
+	mods := weaklyCoupled("p", "A", "B", 5, 20) // all filtered at default 30
+
+	opts := couplingOpts()
+	opts.Warn = nil
+
+	rows := couplingResultRows(t, mods, opts)
+	if len(rows) != 0 {
+		t.Errorf("rows = %+v, want empty", rows)
+	}
+}

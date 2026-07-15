@@ -1,12 +1,14 @@
 // Package pipeline composes the optional transform stages that sit between the
-// git-log parser and an analysis. It applies grouping, temporal windowing, and
-// team mapping in the fixed order code-maat uses (group -> temporal -> teammap),
-// with each stage a no-op when its configuration is absent, so every analysis
-// honors --group, --temporal-period, and --team-map uniformly.
+// git-log parser and an analysis. It applies path filtering, grouping, temporal
+// windowing, and team mapping in a fixed order (filter -> group -> temporal ->
+// teammap), with each stage a no-op when its configuration is absent, so every
+// analysis honors --include/--exclude, --group, --temporal-period, and
+// --team-map uniformly.
 package pipeline
 
 import (
 	"github.com/andreswebs/codelens/internal/model"
+	"github.com/andreswebs/codelens/internal/transform/filter"
 	"github.com/andreswebs/codelens/internal/transform/group"
 	"github.com/andreswebs/codelens/internal/transform/teammap"
 	"github.com/andreswebs/codelens/internal/transform/temporal"
@@ -16,6 +18,9 @@ import (
 // its stage: a nil/empty GroupSpecs skips grouping, a TemporalPeriod of 0 skips
 // windowing, and a nil/empty TeamMap skips team substitution.
 type Config struct {
+	// FilterSpec holds the compiled include/exclude path globs; a zero Spec
+	// skips filtering. It runs first so globs match raw file paths.
+	FilterSpec filter.Spec
 	// GroupSpecs are the compiled layer-mapping rules; nil or empty skips
 	// grouping. An empty rule set is treated as "no grouping requested" rather
 	// than "drop every entity".
@@ -27,13 +32,17 @@ type Config struct {
 	TeamMap map[string]string
 }
 
-// Apply runs the enabled stages over mods in code-maat's canonical order:
-// grouping first (so windowing and team metrics see layer-level entities), then
+// Apply runs the enabled stages over mods in canonical order: path filtering
+// first (so include/exclude globs match raw file paths, not layer names), then
+// grouping (so windowing and team metrics see layer-level entities), then
 // temporal windowing, then team mapping. When cfg enables no stage the input is
 // returned unchanged. The input slice is never mutated; each active stage
 // returns a fresh slice.
 func Apply(mods []model.Modification, cfg Config) ([]model.Modification, error) {
 	out := mods
+	if !cfg.FilterSpec.IsZero() {
+		out = filter.Apply(out, cfg.FilterSpec)
+	}
 	if len(cfg.GroupSpecs) > 0 {
 		out = group.Apply(out, cfg.GroupSpecs)
 	}

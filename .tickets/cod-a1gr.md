@@ -1,6 +1,6 @@
 ---
 id: cod-a1gr
-status: open
+status: closed
 deps: []
 links: [cod-l1az]
 created: 2026-07-15T03:40:57Z
@@ -188,3 +188,9 @@ docs/cli-design.md                                   document the global filter 
 - `docs/cli-design.md` (transforms), `references/operating.md` (pipeline transforms)
 - Skills: `/golang` (new package, coded errors, RE2/glob safety), `/tdd`,
   `/llm-coding` (no speculative options beyond include/exclude)
+
+## Notes
+
+**2026-07-15T04:13:48Z**
+
+Implemented path include/exclude globs on both surfaces. Go: new src/internal/transform/filter package (Compile/Apply, ErrInvalidGlob exit 2) using github.com/bmatcuk/doublestar/v4 (2nd direct dep); wired as first pipeline stage (filter->group->temporal->team-map) via Config.FilterSpec; global --include/--exclude StringSlice flags compiled in pipelineConfig. Python: enclosure.py gets matching --include/--exclude via a glob_to_regex() translator (stdlib 3.12 lacks ** glob), applied to BOTH the tokei structure and weights before build_tree, with an empty-node-set guard (exit 3). Precedence exclude-after-include on both. Docs updated (cli-design.md flags+pipeline order, operating.md authored-only recipe, catalog.md enclosure note); markdownlint clean. Tests: filter_test.go, pipeline FilterBeforeGroup, 3 CLI e2e, 4 enclosure_test.py cases. make build green; ruff+ty clean. GOTCHA: doublestar matches full path and */? do not cross /, so use **/ to span dirs (bare *.g.dart matches root only).

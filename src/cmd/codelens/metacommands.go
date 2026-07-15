@@ -25,7 +25,7 @@ type metaCommand struct {
 // metaCommands is the single table describing every non-analysis command. Its
 // entries drive the cli wiring, the schema command list, and the per-command
 // schema, so a meta command's identity is declared in exactly one place. The
-// action bodies live next to their helpers in schema.go, version_cmd.go, and
+// action bodies live next to their helpers in schema.go and
 // printlogcommand.go.
 func metaCommands() []metaCommand {
 	return []metaCommand{
@@ -34,6 +34,7 @@ func metaCommands() []metaCommand {
 			Summary: printLogCommandUsage,
 			Flags: []analysis.Flag{
 				{Name: "after", Type: "string", Desc: "limit history to commits after `DATE` (YYYY-MM-DD)"},
+				{Name: "all", Type: "bool", Default: false, Desc: "include all refs (default: current branch only)"},
 			},
 			ErrorCodes: []string{"usage_error"},
 			ExitCodes:  []int{0, 2},
@@ -48,12 +49,6 @@ func metaCommands() []metaCommand {
 			ErrorCodes: []string{"usage_error"},
 			ExitCodes:  []int{0, 2},
 			Action:     schemaAction,
-		},
-		{
-			Name:      "version",
-			Summary:   versionUsage,
-			ExitCodes: []int{0},
-			Action:    versionAction,
 		},
 	}
 }

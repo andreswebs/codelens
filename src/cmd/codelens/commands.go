@@ -13,6 +13,7 @@ import (
 	"github.com/andreswebs/codelens/internal/output"
 	"github.com/andreswebs/codelens/internal/pipeline"
 	"github.com/andreswebs/codelens/internal/terr"
+	"github.com/andreswebs/codelens/internal/transform/filter"
 	"github.com/andreswebs/codelens/internal/transform/group"
 	"github.com/andreswebs/codelens/internal/transform/teammap"
 	"github.com/urfave/cli/v3"
@@ -67,6 +68,14 @@ func globalFlags(format *string, debug *bool) []cli.Flag {
 		&cli.IntFlag{
 			Name:  "rows",
 			Usage: "cap output to `N` rows after sorting (0 = all)",
+		},
+		&cli.StringSliceFlag{
+			Name:  "include",
+			Usage: "keep only entities matching `GLOB` (gitignore-style, repeatable; exclude wins)",
+		},
+		&cli.StringSliceFlag{
+			Name:  "exclude",
+			Usage: "drop entities matching `GLOB` (gitignore-style, repeatable; applied after --include)",
 		},
 		&cli.StringFlag{
 			Name:  "group",
@@ -148,10 +157,11 @@ func toCLIFlag(f analysis.Flag) cli.Flag {
 }
 
 // actionFor returns the cli.ActionFunc that runs descriptor d. The parsed
-// modifications flow log -> parse -> pipeline (group -> temporal -> team-map) ->
-// analysis -> truncate -> emit. The pipeline stages are each skipped unless
-// their flag is supplied, so every analysis honors --group, --temporal-period,
-// and --team-map without wiring them per command.
+// modifications flow log -> parse -> pipeline (filter -> group -> temporal ->
+// team-map) -> analysis -> truncate -> emit. The pipeline stages are each
+// skipped unless their flag is supplied, so every analysis honors
+// --include/--exclude, --group, --temporal-period, and --team-map without
+// wiring them per command.
 func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 	return func(_ context.Context, cmd *cli.Command) error {
 		r, closeLog, err := openLog(cmd, stdin)
@@ -174,7 +184,12 @@ func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 			return err
 		}
 
-		rows, err := d.Run(mods, analysisOpts(cmd, d))
+		opts := analysisOpts(cmd, d)
+		opts.Warn = func(code, message, hint string, details any) {
+			output.EmitWarning(cmd.Root().ErrWriter, code, message, hint, details)
+		}
+
+		rows, err := d.Run(mods, opts)
 		if err != nil {
 			return err
 		}
@@ -187,13 +202,20 @@ func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 	}
 }
 
-// pipelineConfig assembles the transform configuration from the global flags,
-// parsing the --group and --team-map definition files (each in the format its
-// *-format flag selects) and reading --temporal-period. Absent flags leave their
-// stage disabled. A malformed definition surfaces the transform's own coded
-// error; an unreadable file is an input error (exit 3).
+// pipelineConfig assembles the transform configuration from the global flags:
+// compiling the --include/--exclude globs, parsing the --group and --team-map
+// definition files (each in the format its *-format flag selects), and reading
+// --temporal-period. Absent flags leave their stage disabled. A malformed glob
+// or definition surfaces the transform's own coded error (exit 2); an unreadable
+// file is an input error (exit 3).
 func pipelineConfig(cmd *cli.Command) (pipeline.Config, error) {
 	var cfg pipeline.Config
+
+	spec, err := filter.Compile(cmd.StringSlice("include"), cmd.StringSlice("exclude"))
+	if err != nil {
+		return pipeline.Config{}, err
+	}
+	cfg.FilterSpec = spec
 
 	if path := cmd.String("group"); path != "" {
 		specs, err := parseDefinition(path, "group", func(r io.Reader) ([]group.Spec, error) {

@@ -15,7 +15,7 @@ func TestEmitError_JSON_Coded(t *testing.T) {
 	err := terr.New("parse_error", 3, "run print-log-command", "bad log")
 
 	var buf bytes.Buffer
-	output.EmitError(&buf, "json", err)
+	output.EmitError(&buf, err)
 
 	var env struct {
 		SchemaVersion int  `json:"schema_version"`
@@ -46,15 +46,45 @@ func TestEmitError_JSON_Coded(t *testing.T) {
 	}
 }
 
-func TestEmitError_Text_Coded(t *testing.T) {
-	err := terr.New("parse_error", 3, "run print-log-command", "bad log")
+func TestEmitError_AlwaysJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantCode string
+	}{
+		{"coded", terr.New("parse_error", 3, "run print-log-command", "bad log"), "parse_error"},
+		{"usage classified", errors.New("flag provided but not defined: -bogus"), "unknown_flag"},
+		{"plain", errors.New("boom"), "internal_error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			output.EmitError(&buf, tt.err)
 
-	var buf bytes.Buffer
-	output.EmitError(&buf, "text", err)
-
-	want := "✗ bad log\n  hint: run print-log-command\n"
-	if got := buf.String(); got != want {
-		t.Errorf("EmitError text = %q, want %q", got, want)
+			var env struct {
+				SchemaVersion int  `json:"schema_version"`
+				OK            bool `json:"ok"`
+				Error         struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+				} `json:"error"`
+			}
+			if e := json.Unmarshal(buf.Bytes(), &env); e != nil {
+				t.Fatalf("stderr is not a JSON error envelope: %v\ngot: %s", e, buf.String())
+			}
+			if env.SchemaVersion != output.SchemaVersion {
+				t.Errorf("schema_version = %d, want %d", env.SchemaVersion, output.SchemaVersion)
+			}
+			if env.OK {
+				t.Errorf("ok = true, want false")
+			}
+			if env.Error.Code != tt.wantCode {
+				t.Errorf("code = %q, want %q", env.Error.Code, tt.wantCode)
+			}
+			if env.Error.Message != tt.err.Error() {
+				t.Errorf("message = %q, want %q", env.Error.Message, tt.err.Error())
+			}
+		})
 	}
 }
 
@@ -63,7 +93,7 @@ func TestEmitError_Details(t *testing.T) {
 	err := base.WithDetails(map[string]any{"entry": 4, "line": "foo"})
 
 	var buf bytes.Buffer
-	output.EmitError(&buf, "json", err)
+	output.EmitError(&buf, err)
 
 	var env struct {
 		Error struct {
@@ -116,7 +146,7 @@ func TestEmitError_UsageErrorClassified(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			output.EmitError(&buf, "json", errors.New(tt.msg))
+			output.EmitError(&buf, errors.New(tt.msg))
 
 			var env struct {
 				OK    bool `json:"ok"`

@@ -13,7 +13,9 @@ import (
 // logCommandBase is the git command that produces a codelens-compatible log:
 // the git2 format extended with the commit subject (%s) so every analysis,
 // including messages, runs on a single log shape. See cli-design.md section 5.
-const logCommandBase = "git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN--%s' --no-renames"
+// It reads the checked-out branch's history by default (the --all opt-in
+// restores all refs) and applies .mailmap so author aliases collapse.
+const logCommandBase = "git log --numstat --date=short --pretty=format:'--%h--%ad--%aN--%s' --no-renames --use-mailmap"
 
 // dateLayout is the YYYY-MM-DD form accepted by --after; it is git's
 // --date=short shape and time zero for code-age.
@@ -37,14 +39,18 @@ var errBadAfter = terr.New(
 // agent has to memorize the format. The output is the plain command line on
 // stdout, not a JSON envelope, because it is meant to be copied and run.
 func printLogCommandAction(_ context.Context, cmd *cli.Command) error {
-	return emitLogCommand(cmd.Root().Writer, cmd.String("after"))
+	return emitLogCommand(cmd.Root().Writer, cmd.String("after"), cmd.Bool("all"))
 }
 
-// emitLogCommand writes the log command to w, appending an --after=DATE window
-// when after is non-empty. A non-empty after that is not a valid YYYY-MM-DD
-// date is a usage error and nothing is written.
-func emitLogCommand(w io.Writer, after string) error {
+// emitLogCommand writes the log command to w. When all is true it inserts --all
+// (right after "git log") to read every ref rather than the current branch. It
+// appends an --after=DATE window when after is non-empty; a non-empty after that
+// is not a valid YYYY-MM-DD date is a usage error and nothing is written.
+func emitLogCommand(w io.Writer, after string, all bool) error {
 	command := logCommandBase
+	if all {
+		command = "git log --all" + command[len("git log"):]
+	}
 	if after != "" {
 		if t, err := time.Parse(dateLayout, after); err != nil || t.Format(dateLayout) != after {
 			bad := errBadAfter.WithDetails(map[string]string{"after": after})

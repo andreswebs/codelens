@@ -1,6 +1,6 @@
 ---
 id: cod-btfg
-status: open
+status: closed
 deps: [cod-lrte]
 links: [cod-12yk]
 created: 2026-07-15T03:40:57Z
@@ -150,3 +150,9 @@ docs/skills/codelens/references/operating.md   --group note: dilution + threshol
 - Depends on: `cod-lrte` (JSON warning channel + `Opts` sink)
 - `docs/skills/codelens/references/catalog.md`, `references/operating.md`
 - Skills: `/golang`, `/tdd`, `/llm-coding`
+
+## Notes
+
+**2026-07-15T04:18:59Z**
+
+Implemented via cod-lrte warning channel. runCoupling now tracks maxDegree (calc.TruncInt of degree) across all candidate pairs and, when len(rows)==0 && len(pairs)>0, raises a nil-safe opts.warn('coupling_all_filtered', ...) with details {max_degree, min_coupling, candidate_pairs}. Exit 0 and empty envelope unchanged; no rows fabricated. Self-pairs are excluded by couplingalgo.couplingFrequencies, so 'no co-changing pairs' (len(pairs)==0) correctly emits no warning. Tests: 4 unit cases (recording sink) in coupling_test.go + CLI e2e in e2e_coupling_warn_test.go (weak-coupling log, degree 29% < 30, asserts single JSON warning line on stderr, level:warning). Note left in descriptor comment; coupling_all_filtered is a warning, NOT added to ErrorCodes/ExitCodes. Docs: catalog.md coupling card + operating.md --group note explain dilution and the warning.

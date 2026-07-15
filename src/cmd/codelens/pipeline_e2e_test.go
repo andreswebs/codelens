@@ -118,6 +118,78 @@ func TestE2E_Pipeline_TeamMap(t *testing.T) {
 	}
 }
 
+// TestE2E_Pipeline_Exclude proves --exclude is honored end-to-end and is
+// repeatable: two exclude globs each drop their matching entity before the
+// analysis runs, leaving only the authored source file.
+func TestE2E_Pipeline_Exclude(t *testing.T) {
+	const log = `--a1--2024-01-01--Alice--c1
+10	0	src/app.go
+5	0	src/Migrations/0001.go
+2	0	src/app.g.dart
+
+--b2--2024-01-02--Bob--c2
+3	0	src/app.go
+`
+	env := runAuthors(t, log, "--exclude", "**/Migrations/**", "--exclude", "**/*.g.dart")
+
+	if env.RowCount != 1 || len(env.Rows) != 1 {
+		t.Fatalf("row_count=%d rows=%d, want 1/1 (generated files excluded)", env.RowCount, len(env.Rows))
+	}
+	if got := env.Rows[0].Entity; got != "src/app.go" {
+		t.Errorf("entity = %q, want src/app.go", got)
+	}
+}
+
+// TestE2E_Pipeline_IncludeThenExclude proves --include/--exclude precedence
+// end-to-end: only included entities survive, and an exclude still drops one of
+// them.
+func TestE2E_Pipeline_IncludeThenExclude(t *testing.T) {
+	const log = `--a1--2024-01-01--Alice--c1
+10	0	src/Page.cs
+5	0	src/Page.Designer.cs
+2	0	src/app.g.dart
+`
+	env := runAuthors(t, log, "--include", "**/*.cs", "--exclude", "**/*.Designer.cs")
+
+	if env.RowCount != 1 || len(env.Rows) != 1 {
+		t.Fatalf("row_count=%d rows=%d, want 1/1", env.RowCount, len(env.Rows))
+	}
+	if got := env.Rows[0].Entity; got != "src/Page.cs" {
+		t.Errorf("entity = %q, want src/Page.cs (.Designer.cs excluded, .dart not included)", got)
+	}
+}
+
+// TestE2E_Pipeline_BadGlob classifies a malformed --exclude glob as a usage
+// error (exit 2) with a coded error envelope on stderr.
+func TestE2E_Pipeline_BadGlob(t *testing.T) {
+	const log = `--a1--2024-01-01--Alice--c1
+10	0	src/app.go
+`
+	var stdout, stderr bytes.Buffer
+	code := run(
+		[]string{"codelens", "authors", "--exclude", "a[b"},
+		strings.NewReader(log), &stdout, &stderr,
+	)
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout should be empty on error, got:\n%s", stdout.String())
+	}
+	var errEnv struct {
+		OK    bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &errEnv); err != nil {
+		t.Fatalf("stderr is not a JSON error envelope: %v\n%s", err, stderr.String())
+	}
+	if errEnv.OK || errEnv.Error.Code != "invalid_glob" {
+		t.Errorf("error envelope = %+v, want ok=false code=invalid_glob", errEnv)
+	}
+}
+
 // TestE2E_Pipeline_BadFile classifies an unreadable --group path as an input
 // error (exit 3) with a coded error envelope on stderr, never a stack trace.
 func TestE2E_Pipeline_BadFile(t *testing.T) {

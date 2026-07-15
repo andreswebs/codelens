@@ -969,3 +969,145 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   `metaCommands()` directly and checks each meta command through BOTH the command
   list and `schema --command`, replacing the old list-only check over
   `metaSummaries()`.
+
+## Structured JSON diagnostics on stderr (cod-lrte)
+
+- Errors are now always the JSON error envelope on stderr, for every `--format`
+  value: `--format` governs results on stdout, not diagnostics on stderr. The
+  `✗ <message>` text path and the `format` parameter of `EmitError` were removed
+  outright (accepted behavior change). `render()` no longer branches; a marshal
+  failure falls back to a minimal `error: <message>` line so an error is never
+  swallowed silently.
+- Warnings use a separate `diagnosticEnvelope` (`output/warning.go`): one JSON
+  line per `EmitWarning` call carrying `level: "warning"` and no `ok` field, so a
+  consumer can distinguish warnings from errors unambiguously. Multiple warnings
+  are valid NDJSON on stderr; a warning never alters the exit code and never
+  reaches stdout.
+- The warning sink reaches analyses without an `output` dependency: `analysis.Opts`
+  carries an optional `WarnFunc` (a plain `func(code, message, hint string, details
+  any)`) plus a nil-safe `(o Opts) warn(...)` method, and the action layer
+  (`actionFor`) supplies a closure over `output.EmitWarning(cmd.Root().ErrWriter,
+  ...)`. Note `internal/analysis` already imports `internal/output` via `schema.go`
+  (pre-existing, unrelated); the criterion "analysis does not import output" is about
+  not adding a new dependency for the warning facility, which the plain func type
+  satisfies.
+- This ticket only established the facility (no-op default + tests); `cod-btfg`
+  (grouped coupling returns zero rows at default thresholds) is the first consumer.
+
+## Enclosure node-set unified structure-first across all modes (cod-l1az)
+
+- `enclosure.py` previously chose a different node set per map mode: numeric
+  (hotspot/code-age) drew every tokei file, but categorical (knowledge) ignored
+  `--structure` entirely and drew only the weighted files at uniform `size: 1`. The
+  two families disagreed on which files exist (test-drive: 9,145 vs 11,017 files)
+  and the knowledge map never used tokei sizes.
+- Fix (approach A): when `--structure` is given, the tokei structure is the node
+  set for every mode, sized by tokei `code`. Structure is now loaded once, up front
+  in `main()`, and both the categorical and numeric branches key off the shared
+  `sizes` dict; without `--structure` every mode still degrades to the weights.
+- Missing-weight rule is now uniform: a tokei file absent from the weights renders
+  neutral. Numeric maps give it `weight: 0.0` (the cold end) instead of the old
+  `norm(numeric.get(p, lo))`; the old form was a latent bug under `--invert`, where
+  `norm(lo)` is `1.0`, so an unchanged file drew HOT on the code-age map. Categorical
+  maps give it a reserved `(unowned)` sentinel category (`UNOWNED_CATEGORY`).
+- The circle-packing template had no categorical color logic at all (it colored
+  every leaf by `weight ?? 0`, so knowledge maps were uniform cold). Added a
+  `leafFill(d)` helper: ordinal `schemeTableau10` per real category, a neutral grey
+  (`#5a6270`) for the `(unowned)` sentinel, and the unchanged sequential scale for
+  numeric `weight`. Numeric maps render identically to before.
+- Testing: `enclosure.py` is stdlib-only, so `enclosure_test.py` drives it as a
+  subprocess and asserts on the `--json-out` hierarchy and the `wrote ... (N files)`
+  count, never internals. No Python test runner is wired into `make build`; run
+  `python3 -m unittest enclosure_test` (or `uv run enclosure_test.py`) from the
+  scripts dir. Lint/type with `uvx ruff check` and `uvx ty check` (no project ruff
+  config exists, and the existing scripts are not ruff-format-clean, so do not run
+  `ruff format` over them - it rewrites unrelated pre-existing lines).
+- This unblocks `cod-a1gr` Part B (enclosure `--include`/`--exclude`), which filters
+  the same shared `sizes`/`weights` dicts this ticket restructured.
+
+## Path include/exclude glob filter, both surfaces (cod-a1gr)
+
+- Added a `filter` pipeline transform (`src/internal/transform/filter`) plus
+  global `--include`/`--exclude` repeatable flags, and the same options on
+  `enclosure.py`. Precedence is exclude-after-include; filtering runs FIRST in the
+  pipeline (`filter -> group -> temporal -> team-map`) so globs match raw file
+  paths (`**/Migrations/**`), not the layer names grouping produces.
+- Glob engine: `github.com/bmatcuk/doublestar/v4` (the second third-party Go dep
+  after `urfave/cli/v3`). Compile-time validation via `doublestar.ValidatePattern`;
+  match via `doublestar.MatchUnvalidated` (patterns are pre-validated). A malformed
+  glob is a usage error (`invalid_glob`, exit 2), mirroring `group.ErrInvalidGroup`.
+- Semantics gotcha (matters for the shared glob set): doublestar matches the FULL
+  entity path and `*`/`?` do NOT cross `/`. So a bare `*.g.dart` matches only
+  root-level files, unlike gitignore's "match in any directory". Always use `**/`
+  to span directories (`**/*.g.dart`). The recipe in operating.md uses the `**/`
+  forms for this reason.
+- `enclosure.py` cannot see the external tokei structure that `codelens` filters,
+  so Part B reapplies the SAME glob set to both the `sizes` (structure) and
+  `weights` dicts before `build_tree`, after `strip_prefix`. Python has no stdlib
+  `**` glob under 3.12, so `glob_to_regex()` translates the glob to an anchored
+  regex with doublestar-compatible semantics (`**` crosses `/`, `*`/`?` do not);
+  `enclosure_test.py` verifies parity behaviorally. Filtering to an empty node set
+  is an empty result (exit 3), guarded before the numeric branch that would
+  otherwise `max()` an empty dict.
+- `make build` is Go-only; it does not run the Python tests. Run
+  `python3 -m unittest enclosure_test` from the scripts dir, and lint/type with
+  `uvx ruff check` / `uvx ty check` as cod-l1az notes.
+
+## Grouped coupling silent-empty warning (cod-btfg)
+
+- `runCoupling` (`src/internal/analysis/coupling.go`) now tracks the max
+  `calc.TruncInt(degree)` across every candidate pair and, when
+  `len(rows)==0 && len(pairs)>0`, raises `coupling_all_filtered` via the nil-safe
+  `opts.warn` sink from cod-lrte. Details carry `max_degree`, `min_coupling`,
+  `candidate_pairs`. The stdout envelope (exit 0, `rows: []`) is unchanged; the
+  warning is advisory only, so it is NOT in the descriptor's `ErrorCodes`/
+  `ExitCodes` (those are exit-affecting outcomes only).
+- Distinguishing "everything filtered" from "nothing coupled" hinges on
+  `couplingalgo.couplingFrequencies` dropping self-pairs (`p.A == p.B`): a log
+  where entities never co-change yields `len(pairs)==0`, so no warning fires.
+- Test-fixture gotcha: the git2+subject parser rejects non-hex commit hashes
+  ("malformed commit hash"). Generated logs in CLI e2e tests must use hex hashes
+  (e.g. `fmt.Sprintf("--%07x--...", n)`), not `h1`/`h2`.
+
+## complexity_trend.py rename-aware history (cod-dxdk)
+
+- `git log --follow` walks history across renames, but the old two-step then did
+  `git show <rev>:<current-path>` for every rev, so any commit predating a rename
+  hit `fatal: path '<current-path>' exists on disk, but not in '<sha>'` and
+  `git()` aborted the whole run (exit 2, no chart). This bit most real hotspots.
+- Fix: `enumerate_revs` runs `git log --follow --name-status
+  --format=%H\t%ad --date=short -- <file>` and reads the path per commit straight
+  from its status line, so no separate old/new path propagation is needed: a
+  rename block is `R<score>\t<old>\t<new>` (the NEW side is the path that commit
+  produced, which is what exists in that commit's tree, so `git show <rev>:<new>`
+  succeeds), everything else is `<status>\t<path>`. Copies (`C<score>`) take the
+  new side too. Header lines are detected by "2 tab-fields and field 0 is a
+  40-hex hash"; the blank line the custom `--format` emits before the status
+  lines is skipped.
+- Kept `git()`'s fatal-on-nonzero behavior: the fix passes the correct path, it
+  does not swallow failures, so a genuine `git show` error still surfaces.
+- Tests (`complexity_trend_test.py`, sibling `*_test.py` per the enclosure.py
+  convention) drive real `git init` fixture repos built with a `git mv` helper -
+  no mocking git. They assert only on observable output: exit code, `-o` file
+  existence, and the trailing `wrote ... (N revisions)` count. Two renames of an
+  N-in-place-commit file count as N+2 revisions (each `git mv` is its own commit).
+
+## cmd: drop version subcommand, --version prints bare (cod-5t5t)
+
+- Reverses part of cod-7fb5 (P5-2): the `version` subcommand is gone; the build
+  version is now only the `--version` flag, printing the bare `version.Current()`
+  string (no `codelens version <v>` prefix). Bare output is trivial to capture and
+  compare in scripts.
+- urfave/cli v3 renders `--version` via a package-level `cli.VersionPrinter`
+  (`func(cmd *cli.Command)`, default `DefaultPrintVersion`). Override it in an
+  `init()` so it runs before any `run()`. Write to `cmd.Root().Writer`, not
+  `os.Stdout`, so stdout-capturing tests keep working:
+  `fmt.Fprintln(cmd.Root().Writer, cmd.Root().Version)`.
+- Removing the entry from `metaCommands()` cascades for free: `codelens version`
+  becomes `unknown_command` (exit 2), `schema` stops listing it, and
+  `schema --command version` becomes a usage error, all because the cli wiring,
+  the schema list, and the unknown-command hint are projected from that one table.
+  The `schemacodes_test.go` conformance guard iterates `metaCommands()` and holds
+  no fixed meta-command count, so it adjusted with no edit.
+- The two version surfaces "sharing one source" that P5-2 wired is now a single
+  surface; `version.Current()` remains the source of truth.

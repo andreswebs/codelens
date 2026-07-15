@@ -38,13 +38,30 @@ appear, as cool circles, giving the whole-codebase view the book describes.
 
 Same tree-builder and template downstream; only leaf population differs.
 
+### One node set across all modes
+
+The node-set and missing-weight rules are **the same for every map** (hotspot,
+code-age, knowledge), so the three are directly comparable:
+
+- **Full mode (`--structure` given):** the node set is the tokei files for every
+  mode, including categorical. Every circle is sized by tokei `code`. A file
+  present in tokei but absent from the weights renders neutral: numeric maps give
+  it the cold end (`weight` `0.0`, so `--invert` never draws an unchanged file
+  hot); categorical maps give it the reserved `(unowned)` sentinel category, which
+  the template colors neutral grey.
+- **Degraded mode (`--structure` omitted):** every mode falls back to the weights
+  as the node set (only files with a recorded change). Numeric maps size circles by
+  the weight value; categorical maps use a uniform `size` of `1`.
+
 ## Join and normalization
 
 - Join key: the raw path string, after stripping a leading `./` from both sides.
 - Normalize the numeric weight to `0.0 .. 1.0` as `value / max(value)` across all
   matched files. `0.0` is coolest, `1.0` the hottest.
 - Categorical weight (knowledge map): carry the category (e.g. `main_dev`) on the
-  leaf instead of a normalized number; the client assigns one color per category.
+  leaf instead of a normalized number; the client assigns one color per category,
+  and the reserved `(unowned)` category (a tokei file with no recorded author in
+  the window) is drawn neutral grey.
 
 ## Tree building
 

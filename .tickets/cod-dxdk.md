@@ -1,6 +1,6 @@
 ---
 id: cod-dxdk
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-15T03:40:57Z
@@ -133,3 +133,9 @@ PEP 723 inline-metadata style already in the scripts).
 - `docs/skills/codelens/references/catalog.md` (Complexity trend card)
 - Skills: `/tdd` (fixture-repo tests, vertical slices), `/llm-coding` (surgical,
   no speculative features)
+
+## Notes
+
+**2026-07-15T04:27:15Z**
+
+Fixed rename abort via approach A (resolve historical path per revision). New enumerate_revs() runs 'git log --follow --name-status --format=%H\t%ad --date=short -- <file>' and reads the path at each commit straight from its status line: rename block R<score>\told\tnew uses the NEW side (the path that commit's tree holds, so 'git show <rev>:<new>' never hits the missing-path fatal); copies (C<score>) likewise; all others use <status>\t<path>. Header lines detected by 2 tab-fields + 40-hex hash. git() fatal-on-nonzero behavior unchanged, so genuine git failures still surface. Tests in sibling complexity_trend_test.py (per enclosure.py convention) drive real git-init fixture repos with a git mv helper, no mocking; assert only on exit code, -o file existence, and trailing 'wrote ... (N revisions)' count. 4 cases: no-rename(3), one-rename(4), two-renames(5), missing-file(exit 3). make build green; ruff/ty clean (only pre-existing matplotlib import-resolution notes).

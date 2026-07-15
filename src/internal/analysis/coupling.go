@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/andreswebs/codelens/internal/analysis/calc"
@@ -74,9 +75,14 @@ func runCoupling(mods []model.Modification, opts Opts) (any, error) {
 	pairs := couplingalgo.Couplings(mods, opts.MaxChangesetSize)
 
 	rows := make([]couplingRow, 0, len(pairs))
+	maxDegree := 0
 	for _, p := range pairs {
 		avg := calc.Average(p.EntityRevs, p.CoupledRevs)
 		degree := calc.Percentage(float64(p.Shared) / avg)
+
+		if d := calc.TruncInt(degree); d > maxDegree {
+			maxDegree = d
+		}
 
 		// within-threshold? takes the average revisions as its revs argument;
 		// floor(avg) equals the raw ratio for the inclusive >= min-revs check.
@@ -111,6 +117,18 @@ func runCoupling(mods []model.Modification, opts Opts) (any, error) {
 		}
 		return rows[i].Coupled < rows[j].Coupled
 	})
+
+	// Every candidate pair fell below the thresholds. The empty result is valid
+	// but reads as "no coupling"; warn with the highest degree actually seen so
+	// the operator can tell a threshold mismatch from a genuine absence.
+	if len(rows) == 0 && len(pairs) > 0 {
+		opts.warn(
+			"coupling_all_filtered",
+			"0 pairs met the coupling thresholds",
+			fmt.Sprintf("highest observed coupling was %d%%; lower --min-coupling (currently %d) to see weaker links", maxDegree, opts.MinCoupling),
+			map[string]any{"max_degree": maxDegree, "min_coupling": opts.MinCoupling, "candidate_pairs": len(pairs)},
+		)
+	}
 
 	return rows, nil
 }
