@@ -283,5 +283,20 @@ class TestPathFilter(EnclosureCase):
         self.assertIn("invalid glob", stderr)
 
 
+class TestDomination(EnclosureCase):
+    def test_dominant_file_warns(self) -> None:
+        rc, stderr, _tree = self.run_enclosure(
+            weights={"src/a.go": 5},
+            structure={"data/big.json": 900, "src/a.go": 50, "src/b.go": 50},
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertIn("dominant: data/big.json 90% (900 LOC)", stderr)
+
+    def test_no_structure_never_warns(self) -> None:
+        rc, stderr, _tree = self.run_enclosure(weights={"big": 1000, "a": 1})
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertNotIn("dominant:", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

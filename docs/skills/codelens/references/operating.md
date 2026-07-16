@@ -165,6 +165,25 @@ authorship and totals stay whole. `scripts/run.bash` is the canonical
 implementation: it applies its built-in exclude set to exactly those
 entity-centric analyses and leaves `communication` and `summary` unfiltered.
 
+### Reference-data domination
+
+Even after the generated-file globs, a few large reference-data or spec files (for
+example `naics_*.json`, `public/v0/openapi.yaml`) can occupy most of a treemap,
+because area is tokei LOC, not change. `treemap.py` and `enclosure.py` warn on
+stderr for any single file over 10% of total mapped LOC:
+
+```text
+dominant: public/v0/openapi.yaml 34% (12040 LOC)
+```
+
+The map is never altered; the tool only names the offender so you decide. When a
+named file is reference data rather than code you maintain, add its path to the same
+`--exclude` set and re-run. The check is computed on the post-exclude node set, so
+each re-run surfaces the next offender until the map reads as code. There is
+deliberately no size-threshold auto-exclude (it would silently drop a legitimately
+large source file) and no area rescale (it would break the treemap's area-as-size
+contract); the explicit `--exclude` is the one remedy.
+
 ## Analysis period
 
 Scope the git log by date (`--after=` on the log command). Heuristics: one year is

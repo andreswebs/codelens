@@ -52,6 +52,13 @@ are hand-maintained and must **not** be excluded. To keep the code hotspots legi
 read the code-vs-docs split that `scripts/digest.py` produces rather than excluding
 config.
 
+Map area is tokei LOC, so a large reference or spec file occupies area without being
+hot. `treemap.py` and `enclosure.py` warn on stderr (`dominant: <path> <pct>%`) when
+one file exceeds 10% of mapped LOC; the remedy is to `--exclude` that path, not to
+read it as risk. Raw tokei language totals mislead the same way: one fleet repo read
+as 1.26M "JSON" LOC against 35k PHP, almost all of it generated. Size is only a
+severity multiplier on a file that is also hot, never a signal on its own.
+
 ### Complexity trend
 
 Indentation is the complexity proxy; the **shape** matters more than the number.

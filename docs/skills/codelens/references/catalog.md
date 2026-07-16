@@ -20,9 +20,10 @@ the heuristics table, the misuse guardrails, and how to phrase the finding - is 
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** the **offender profile** is big + hot, but colour (change) is the lead
   signal and size (LOC) the severity multiplier - a large pale circle is
-  complex-but-stable. Scope out generated files first (false positives). Heuristics
-  and full reading: [interpretation.md](interpretation.md). Contract:
-  [enclosure.md](enclosure.md).
+  complex-but-stable. Scope out generated files first (false positives); large
+  reference/spec files can dominate the map by size (the tool warns `dominant:` over
+  10% of mapped LOC, `--exclude` them). Heuristics and full reading:
+  [interpretation.md](interpretation.md). Contract: [enclosure.md](enclosure.md).
 
 ## Knowledge map
 

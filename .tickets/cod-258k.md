@@ -1,6 +1,6 @@
 ---
 id: cod-258k
-status: open
+status: closed
 deps: []
 links: [cod-a1gr, cod-gijq]
 created: 2026-07-15T20:37:52Z
@@ -97,3 +97,27 @@ the analyst decide, and must never silently alter the map.
 - Degraded renderers created in cod-gijq; `--exclude` flag from cod-a1gr (used by the
   recipe). Origin: fleet-run friction log (F5, F6).
 
+## Notes
+
+**2026-07-16T12:30:45Z**
+
+Implemented and verified. Added `warn_domination(leaves)` to BOTH `treemap.py` and
+`enclosure.py` (the leaf-building is identical across the two self-contained scripts,
+so parity was done here, not deferred): it sums `leaf["size"]` (tokei LOC) over the
+post-exclude node set and prints `dominant: <path> <pct>% (<LOC> LOC)` on stderr for
+each file over 10% of the total, most-dominant first, capped at five; exit code stays
+0 and the map is never altered. Called from `main` only when `--structure` is given
+(when area degrades to the weight, a file dominating by area is the real signal). No
+size-threshold auto-exclude and no area rescale were added (both explicitly rejected;
+`--exclude` is the one remedy). Tests: treemap_test.py gained a TestDomination class
+(6 cases: warns with pct+LOC, no-warning under threshold, gated on --structure,
+categorical mode, capped at five, excluded file not counted) -> 15 total;
+enclosure_test.py gained 2 parity cases -> 13 total. Docs: operating.md gained a
+"Reference-data domination" recipe beside the authored-only section;
+interpretation.md's hotspot block gained a reading note with F6 folded in (tokei area
+vs hotness; the 1.26M "JSON" LOC vs 35k PHP example); catalog.md's hotspot card gained
+a one-line hook. Verified: ruff + ty clean; strict pyright clean on treemap.py and
+enclosure.py with matplotlib+squarify resolved in a venv (a bare run reports 16
+pre-existing matplotlib Unknowns in draw(), unrelated to this change, confirmed by a
+stash check); all six script suites green; edited Markdown markdownlint clean;
+skill_ref.py validate passes.

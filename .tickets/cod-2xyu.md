@@ -2,7 +2,7 @@
 id: cod-2xyu
 status: closed
 deps: [cod-gijq, cod-9yuv]
-links: [cod-84ky, cod-a1gr, cod-a6wv]
+links: [cod-84ky, cod-a1gr, cod-a6wv, cod-ymnw]
 created: 2026-07-15T10:01:20Z
 type: feature
 priority: 1

@@ -34,6 +34,14 @@ EXIT_EMPTY = 3
 
 MAX_GLOB_LEN = 1000
 
+# A single file occupying more than this share of total mapped LOC visually
+# dominates the map, drowning the real code. The map is left unaltered (radius stays
+# true LOC) and the offender named so it can be added to --exclude and the run
+# repeated. Only meaningful when radius is tokei LOC (--structure); without it,
+# radius is the weight and a dominant file is the real signal, not noise.
+DOMINATION_THRESHOLD = 0.10
+DOMINATION_TOP = 5
+
 # Sentinel category for a file present in the tokei structure but absent from the
 # categorical weights (e.g. a file with no recorded author in the window). The
 # template renders it in neutral grey, distinct from every real category color.
@@ -43,6 +51,28 @@ UNOWNED_CATEGORY = "(unowned)"
 def die(msg: str, code: int) -> NoReturn:
     print(f"enclosure.py: {msg}", file=sys.stderr)
     raise SystemExit(code)
+
+
+def warn_domination(leaves: dict[str, dict[str, Any]]) -> None:
+    """Warn on stderr for each file whose LOC exceeds DOMINATION_THRESHOLD of the
+    total mapped LOC, most-dominant first, capped at DOMINATION_TOP. Computed on the
+    given (post-exclude) node set, so re-running after an --exclude surfaces the next
+    offender. Never alters the map or the exit code."""
+    total = sum(int(leaf["size"]) for leaf in leaves.values())
+    if total <= 0:
+        return
+    offenders = sorted(
+        (
+            (path, loc)
+            for path, leaf in leaves.items()
+            if (loc := int(leaf["size"])) > DOMINATION_THRESHOLD * total
+        ),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
+    for path, loc in offenders[:DOMINATION_TOP]:
+        pct = round(loc / total * 100)
+        print(f"dominant: {path} {pct}% ({loc} LOC)", file=sys.stderr)
 
 
 def glob_to_regex(pattern: str) -> str:
@@ -329,6 +359,11 @@ def main() -> None:
                 p: {"size": max(v, 1), "weight": round(norm(v), 4)}
                 for p, v in numeric.items()
             }
+
+    # Radius is tokei LOC only when --structure is given; warn when a single file
+    # dominates that area (see references/operating.md, the reference-data recipe).
+    if args.structure:
+        warn_domination(leaves)
 
     tree = build_tree(args.root_name, leaves)
 

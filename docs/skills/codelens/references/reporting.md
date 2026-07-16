@@ -95,6 +95,30 @@ Gotcha: some host environments run a hook that guards the Write tool on files na
 heredoc, or write to a differently-named file and rename it. This is host-environment
 behavior, not a codelens rule.
 
+### Writing a findings block
+
+The prose is the judgment the report cannot pin. Write each block from
+`out/digest.md` (open the raw JSON only for a number the digest omits):
+
+- **Ground every claim in the digest's numbers.** Name the specific file, coupled
+  pair, author, or fractal/degree value with its metric; no generic filler.
+- **Be honest about thin signal.** If coupling is "none above threshold", or there
+  are only a few commits or authors, say the signal is thin and why. Do not invent
+  findings; a short accurate block beats a padded one.
+- **Separate generated from authored.** If hotspots or churn are dominated by
+  generated or reference data that slipped the excludes, say so rather than reading
+  it as real code risk (see the reference-data note in
+  [operating.md](operating.md)).
+- **`risk_choices`** is three bullets, `Accept:`, `Prioritise now:`, and
+  `Mitigate over time:`, each naming specific files or areas.
+- Keep each block tight (2 to 6 sentences), read per
+  [interpretation.md](interpretation.md), and honour its guardrails: never rank
+  individuals, ownership and communication are probabilistic key-person and
+  coordination risk, and the commit word cloud is heuristic only.
+
+This mirrors the digest-first, subagent-friendly workflow used to write findings at
+fleet scale: one agent per repo, grounded in that repo's `digest.md`.
+
 ## Figures
 
 `--figures-dir` is scanned for these stems (`.svg`), one per section:

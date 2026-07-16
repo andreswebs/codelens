@@ -204,5 +204,65 @@ class TestFilter(TreemapCase):
         self.assertIn("invalid glob", stderr)
 
 
+class TestDomination(TreemapCase):
+    def test_dominant_file_warns_with_pct_and_loc(self) -> None:
+        rc, stderr, _leaves, _e = self.run_treemap(
+            weights={"src/a.go": 5},
+            structure={"data/big.json": 900, "src/a.go": 50, "src/b.go": 50},
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertIn("dominant: data/big.json 90% (900 LOC)", stderr)
+        self.assertNotIn("dominant: src/a.go", stderr)
+
+    def test_no_file_over_threshold_no_warning(self) -> None:
+        files = {f"src/f{i}.go": 100 for i in range(12)}  # each ~8.3% of total
+        rc, stderr, _leaves, _e = self.run_treemap(
+            weights={"src/f0.go": 5}, structure=files
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertNotIn("dominant:", stderr)
+
+    def test_no_structure_never_warns(self) -> None:
+        # Degraded mode: area is the weight, so a file dominating by weight is the
+        # real signal, not noise; the warning is gated on --structure.
+        rc, stderr, _leaves, _e = self.run_treemap(weights={"big": 1000, "a": 1})
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertNotIn("dominant:", stderr)
+
+    def test_categorical_mode_warns(self) -> None:
+        rc, stderr, _leaves, _e = self.run_treemap(
+            weights={"src/a.go": "alice"},
+            weight_col="main_dev",
+            structure={"data/big.json": 900, "src/a.go": 100},
+            extra=["--categorical"],
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertIn("dominant: data/big.json 90% (900 LOC)", stderr)
+
+    def test_offenders_capped_at_five(self) -> None:
+        files = {f"big{i}.json": 150 for i in range(6)}  # six files at 15% each
+        files["small.go"] = 100  # exactly 10%, not over the threshold
+        rc, stderr, _leaves, _e = self.run_treemap(
+            weights={"small.go": 5}, structure=files
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertEqual(stderr.count("dominant:"), 5)
+        self.assertNotIn("small.go", stderr)  # 10% is not > 10%
+
+    def test_excluded_file_not_counted_toward_total(self) -> None:
+        files = {"data/gen.json": 900}
+        files.update({f"src/f{i}.go": 10 for i in range(10)})
+        rc, stderr, _leaves, _e = self.run_treemap(
+            weights={"src/f0.go": 5},
+            structure=files,
+            extra=["--exclude", "data/gen.json"],
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        # After dropping gen.json the total is 100 and each file is exactly 10%,
+        # so nothing triggers and the excluded file is never named.
+        self.assertNotIn("dominant:", stderr)
+        self.assertNotIn("gen.json", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
