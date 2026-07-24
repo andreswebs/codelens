@@ -247,12 +247,16 @@ into a JSON parser is always safe. Errors are a JSON envelope:
 With `--format text`, errors render as `✗ <message>` and a `hint:` line on
 stderr instead.
 
+Exit codes follow the family-wide taxonomy in
+[ADR 0002](docs/adr/0002-exit-code-taxonomy.md):
+
 | Exit | Meaning               | Examples                                                                  |
 | ---- | --------------------- | ------------------------------------------------------------------------- |
 | 0    | success (incl. empty) | any analysis that ran                                                     |
-| 2    | usage error           | unknown flag or subcommand, bad flag value, `messages` without expression |
-| 3    | input error           | empty or unparseable log, malformed `--group`/`--team-map`                |
-| 1    | internal / unexpected | a bug; the only path that prints a trace, and only under `--debug`        |
+| 64   | usage error           | unknown flag or subcommand, bad flag value, `messages` without expression, malformed glob/group |
+| 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat |
+| 70   | internal / unexpected | a bug; the only path that prints a trace, and only under `--debug`        |
+| 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                       |
 
 ## Visualizing with the `codelens` skill
 

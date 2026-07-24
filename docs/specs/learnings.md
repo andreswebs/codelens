@@ -1111,3 +1111,61 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   no fixed meta-command count, so it adjusted with no edit.
 - The two version surfaces "sharing one source" that P5-2 wired is now a single
   surface; `version.Current()` remains the source of truth.
+
+## Migrate Go module from src/ to repo root (cod-174y)
+
+- The module path `github.com/andreswebs/codelens` mapped to a `go.mod` under
+  `src/`, so the module was unresolvable via the proxy (`go install ...@latest`,
+  pkg.go.dev, govulncheck, dependabot all failed). Moving `go.mod`, `go.sum`,
+  `.golangci.yml`, `cmd/`, and `internal/` up to the repo root fixes the mismatch
+  with zero `.go` edits, because the module path already omitted `src`.
+- Used `git mv` so all moves register as renames and history is preserved; the
+  `.golangci.yml` dotfile must be listed explicitly (a glob misses it).
+- With the Makefile already at the module root, `SRC_DIR`/`cd $(SRC_DIR) &&` were
+  pure indirection; removed the variable and dropped the `cd` prefix from every
+  recipe. `CMD_DIR := ./cmd/codelens` and the `version.Override` LDFLAGS path are
+  relative to / independent of the module location and needed no change.
+- SBOM step: `path: src` became `path: .`, but the step runs after `make dist`, so
+  a bare root scan would catalog `bin/` binaries and `dist/` archives. Added a
+  `.syft.yaml` at the repo root excluding build artifacts and non-Go dirs; Syft
+  auto-reads it from the working directory, no extra wiring.
+- CI/release setup-go paths and dependabot's gomod `directory` all moved from
+  `/src` to `/` (`go.mod`/`go.sum` at root). Remaining `src/` grep hits are sample
+  analysis data (foreign-repo entity paths in tests/testdata) and historical
+  learnings entries, not codelens's own layout - left untouched.
+- Step 5 (fleet `go.work` `use` entry) was a no-op here: no `go.work` exists in
+  this environment. It applies only when building inside the fleet workspace.
+
+## Migrate exit codes to the fleet taxonomy, ADR 0002 (cod-gwio)
+
+- Breaking change (v0.x). Old to new: usage 2 to 64 (EX_USAGE); data/content 3
+  to 65 (EX_DATAERR); internal 1 to 70 (EX_SOFTWARE). File-open failures were
+  reclassified from data (3) to I/O: `errLogOpen`/`errFileOpen` become 74
+  (EX_IOERR) and their code string changed from `input_error` to `io_error`. No
+  result sub-codes (1 or 2-63) are claimed: an empty result still exits 0.
+- The boundary lives in `internal/output/errors.go`: `exitUsage` (64) and
+  `exitInternal` (70) are resolved there; every other coded error carries its
+  own exit via `terr.New(code, exit, ...)`. Changing a sentinel is a two-token
+  edit (the exit int, and the doc comment that cites it), so grep
+  `terr.New(` per file was the reliable index rather than line numbers.
+- Every analysis descriptor declares `ExitCodes: []int{0, 64, 65, 70, 74}` (74
+  because each opens the log via `errLogOpen`); meta commands stay `{0, 64}`,
+  matching their prior `{0, 2}` scope. 70 was NOT added to meta: a write/marshal
+  failure could technically reach the internal fallback, but the prior decision
+  declared only the reachable-by-input set, and declaring 70 would demand a
+  meta-command scenario the conformance test cannot drive from input.
+- ADR 0002 requires declarations be tied to REAL exits, not prose. The existing
+  `schemacodes_test.go` only checked schema-declaration consistency; extended it
+  with `TestExitCodes_DeclaredCodesAreExercised`, which maps each declared code
+  to a scenario, asserts the observed exit matches, and asserts the declared
+  union equals the exercised set (both directions, so a new or dropped code
+  trips it). 0/64/65/74 run end to end through `run()`; 70 has no well-formed
+  input path, so its scenario calls `output.ExitCodeFor(errors.New(...))`, the
+  exact resolver `run()` applies at its exit.
+- Golden files: `internal/gitlog/testdata/` holds parsed output (no exit codes)
+  and did not change; `cmd/codelens/testdata/authors.schema.json` embeds the
+  declared exit set and did.
+- Out of scope, left as-is: the visualization skill's render scripts
+  (`docs/skills/codelens/scripts/*`) carry their own `EXIT_USAGE`/empty-result
+  conventions as downstream tools, and `learnings.md`'s historical entries
+  record decisions as made at the time; neither is codelens's binary contract.

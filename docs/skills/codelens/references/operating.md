@@ -112,7 +112,7 @@ Global flags that reshape the input before analysis. They run in a fixed order,
   match at least one include to survive, then any `--exclude` match drops it; with
   no includes, all entities are included and only excludes apply. Filtering runs
   first, before grouping, so globs match raw file paths (`**/Migrations/**`), not
-  layer names. A malformed glob is a usage error (exit 2). Note `*` and `?` do not
+  layer names. A malformed glob is a usage error (exit 64). Note `*` and `?` do not
   cross `/`; use `**` to span directories.
 - `--group FILE` (`--group-format text|json`): map files to architectural layers.
   Text lines are `pattern => name`; unanchored patterns are path-prefix matches,
@@ -212,12 +212,15 @@ message, hint}}`), for every `--format` value including `text` and `table`.
 there is no `✗ <message>` text error path, so parse the envelope's `message` and
 `hint` fields directly.
 
+Exit codes follow the family-wide taxonomy in ADR 0002 (BSD `sysexits.h`):
+
 | Exit | Meaning               | Examples                                                              |
 | ---- | --------------------- | --------------------------------------------------------------------- |
 | 0    | success (incl. empty) | any analysis that ran                                                 |
-| 2    | usage error           | unknown flag/subcommand, bad value, `messages` without `--expression` |
-| 3    | input error           | empty or unparseable log, malformed `--group`/`--team-map`            |
-| 1    | internal              | a bug; prints a trace only under `--debug`                            |
+| 64   | usage error           | unknown flag/subcommand, bad value, `messages` without `--expression`, malformed glob/group |
+| 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat |
+| 70   | internal              | a bug; prints a trace only under `--debug`                            |
+| 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                   |
 
 Non-fatal advisories are emitted as single-line JSON **warning** diagnostics on
 stderr, distinguished from errors by `level: "warning"` (and no `ok` field):

@@ -110,7 +110,7 @@ supported, matched against the full entity path via
 not the layer names grouping produces. Precedence is exclude-after-include: with
 any `--include`, an entity must match at least one include to survive, then any
 `--exclude` drops it; with no includes, all are included and only excludes apply.
-A malformed glob is a usage error (exit 2). `*`/`?` do not cross `/`; use `**` to
+A malformed glob is a usage error (exit 64). `*`/`?` do not cross `/`; use `**` to
 span directories. The pipeline order is `filter -> group -> temporal -> team-map`.
 
 ### 4.3 Per-analysis flags
@@ -157,11 +157,11 @@ reference doc §6); the schema output is the source of truth per command.
 
 - **Bounded regexes.** `--expression` and grouping patterns are compiled with a
   size/complexity guard; an invalid or oversized pattern is a usage error (exit
-  2), never an unbounded match or hang. `--include`/`--exclude` globs are
+  64), never an unbounded match or hang. `--include`/`--exclude` globs are
   length-bounded and validated the same way, and doublestar's matcher is
   backtracking-safe.
 - **Control characters.** Log/definition content containing disallowed control
-  characters (e.g. NUL) is an input error (exit 3).
+  characters (e.g. NUL) is a data error (exit 65).
 - **Read-only.** All input files are opened read-only; results go only to
   stdout. There is no write surface to sandbox.
 - **Time.** `code-age` computes whole calendar months in **UTC**; `--time-now`
@@ -297,16 +297,20 @@ stdout; `hint` and `details` are omitted when empty.
 
 ### 7.2 Exit codes
 
-| Code | Meaning                      | Examples                                                                                            |
-| ---- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
-| 0    | success (incl. empty result) | any analysis that ran                                                                               |
-| 2    | usage error                  | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`              |
-| 3    | input error                  | unparseable or empty log, malformed `--group`/`--team-map`, churn analysis on a log with no numstat |
-| 1    | internal / unexpected        | bug; only path that prints a trace (with `--debug`)                                                 |
+codelens follows the family-wide taxonomy in
+[ADR 0002](adr/0002-exit-code-taxonomy.md) (BSD `sysexits.h` range):
+
+| Code | Code string(s)                                              | Meaning                     | Examples                                                                                    |
+| ---- | ----------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- |
+| 0    | -                                                           | success (incl. empty result) | any analysis that ran                                                                       |
+| 64   | `usage_error`, `unknown_command`, `unknown_flag`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now` | usage error (EX_USAGE) | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group |
+| 65   | `parse_error`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map` | data error (EX_DATAERR) | unparseable or empty log, malformed `--team-map`, churn analysis on a log with no numstat |
+| 70   | `internal_error`                                            | internal / unexpected (EX_SOFTWARE) | bug; only path that prints a trace (with `--debug`)                                 |
+| 74   | `io_error`                                                  | I/O error (EX_IOERR)        | unreadable `--log`, `--group`, or `--team-map` file                                         |
 
 Coded errors carry a stable string `code` and their own exit code via a
-dedicated `terr`-style package. Usage errors are classified from the CLI
-framework's messages.
+dedicated `terr`-style package. Usage errors from the CLI framework are
+classified from its messages; all resolve to exit 64.
 
 ## 8. Schema introspection
 
@@ -357,7 +361,7 @@ framework's messages.
     }
   ],
   "error_codes": ["parse_error", "empty_log"],
-  "exit_codes": [0, 2, 3, 1]
+  "exit_codes": [0, 64, 65, 70, 74]
 }
 ```
 

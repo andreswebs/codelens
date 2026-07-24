@@ -1,8 +1,8 @@
 ---
 id: cod-gwio
-status: open
-deps: []
-links: []
+status: closed
+deps: [cod-174y]
+links: [cod-174y]
 created: 2026-07-22T18:16:31Z
 type: task
 priority: 2
@@ -139,3 +139,18 @@ codes; they should not change.
 - Release notes drafted (breaking change: usage 2 to 64, input 3 to
   65/74, internal 1 to 70).
 - Leave committing to the repo owner; do not create git commits.
+
+## Notes
+
+**2026-07-24T20:37:42Z**
+
+Depends on and linked to cod-174y (Migrate Go module from src/ to repo root). Sequencing: cod-174y should land first. After that migration the Go module lives at the REPO ROOT, not under src/ - go.mod, go.sum, .golangci.yml, cmd/, and internal/ all move up one level, and the Makefile drops its 'cd $(SRC_DIR)' prefixes so make build/validate/test run from the repo root directly.
+
+Re-check this ticket's paths against the new layout before implementing:
+- The sentinel and code paths cited here (e.g. internal/output/fields.go, internal/output/errors.go, cmd/codelens/main.go, internal/analysis/*.go) are written module-relative WITHOUT a src/ prefix, so they stay valid after migration - they will simply resolve at the repo root instead of under src/.
+- The acceptance criterion already says 'make build passes from the repo root'; after cod-174y that is literally true (no cd into src/). Verify make targets still work post-migration.
+- If cod-gwio is implemented BEFORE cod-174y, all these paths still live under src/ (src/internal/..., src/cmd/...); adjust accordingly. Line numbers cited here may also shift if either change is applied first, so confirm with grep before editing.
+
+**2026-07-24T21:05:45Z**
+
+Migrated exit codes to ADR 0002 taxonomy. Mapping applied: usage 2->64 (EX_USAGE), data/content 3->65 (EX_DATAERR), internal 1->70 (EX_SOFTWARE); errLogOpen/errFileOpen reclassified 3->74 (EX_IOERR) with code string input_error->io_error. Boundary in internal/output/errors.go: exitUsage=64, exitInternal=70. All 19 analysis descriptors declare {0,64,65,70,74}; meta commands {0,64} (70 not added: reachable only via a write fault the conformance test cannot drive from input, matching prior {0,2} scope). Extended cmd/codelens/schemacodes_test.go with TestExitCodes_DeclaredCodesAreExercised, which ties every declared code to a real observed exit (0/64/65/74 via run(); 70 via output.ExitCodeFor on an uncoded error) and asserts declared-union == exercised-set both ways. Updated authors.schema.json golden. Docs updated: cli-design.md 7.2 (new table with code-string column), README.md, operating.md; AGENTS.md verified (delegates to operating.md, no stale literals). Verified end-to-end on a native build: usage=64, empty_log=65, bad --log=74, success=0. RELEASE NOTES (breaking, v0.x): exit codes now follow ADR 0002 - usage errors 2->64, input/data errors 3->65, unreadable input files 3->74 (code input_error->io_error), internal errors 1->70; empty results still exit 0. make build green. Out of scope: viz skill render scripts keep their own EXIT_USAGE contract; learnings.md historical entries left as-is (added a new entry for this migration).
