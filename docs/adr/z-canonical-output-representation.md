@@ -4,6 +4,12 @@ status: accepted
 
 # One canonical, shape-aware JSON representation (drop the format matrix)
 
+Note: `0006-output-contract.md` is the authoritative decision record
+for the stream and envelope contract. This document provides
+repository-specific detail on top of it: codelens's canonical
+shape-aware JSON representation. Where the two disagree, the numbered
+ADR wins.
+
 ## Context
 
 codelens currently exposes a global `--format` flag with four values: `json`
@@ -68,8 +74,9 @@ Specifics:
 Rules that carry over unchanged:
 
 - Errors are still a JSON error envelope on stderr
-  (`{ok: false, error: {code, message, hint}}`), independent of stdout, per the
-  exit-code taxonomy ADR.
+  (`schema_version`, `ok: false`, and an `error` object with `code`, `message`,
+  and optional `hint` and `details`), independent of stdout, per
+  `0006-output-contract.md`.
 - stdout carries only the canonical envelope, so piping into a JSON parser is
   always safe.
 
