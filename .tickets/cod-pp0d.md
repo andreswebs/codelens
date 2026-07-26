@@ -1,6 +1,6 @@
 ---
 id: cod-pp0d
-status: open
+status: closed
 deps: [cod-q42s]
 links: [cod-8eis, cod-q42s, cod-uavr, cod-2x18, cod-vsi0]
 created: 2026-07-26T18:44:40Z
@@ -268,3 +268,17 @@ before the owner commits it.
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T19:42:58Z**
+
+Completed the ADR 0007 golden triple harness in internal/command (tests had already moved there via cod-q42s).
+
+New golden_test.go: goldenCase{name,args,stdin} table is the single source for both TestGolden (compares stdout/.out, stderr/.err, exit/.exit per scenario) and the reworked TestExitCodes_DeclaredCodesAreExercised (reads observed exits from the same table; exit 70 stays the documented output.ExitCodeFor exception). 22 scenarios x 3 files: 7 authors success variants (byte-identical stdout, empty .err, exit 0), 4 usage errors, 3 --format data errors (identical stderr envelope proves always-JSON errors), one per cod-uavr renamed code (unknown_format, unknown_schema_command, invalid_after_date, log_open_failed, input_file_open_failed, invalid_control_char), the coupling warning (non-empty stderr on exit 0), and schema list.
+
+Normalization: <TMPDIR> token swapped for a real t.TempDir() before the run and back out of both streams after, applied before compare AND before -update writes, so no golden holds a temp path (verified by grep). Missing golden fails naming -update; empty stderr is an empty file.
+
+Ordering gotcha: empty stdin short-circuits to empty_log(65) before later validation, so unknown_format and input_file_open_failed need a valid log on stdin; log_open_failed fails at open before any read.
+
+Kept TestE2E_Authors_JSONReviewed and error_format_test.go's decoded JSON-validity check (meaning, not bytes). Removed the 4 redundant TestUsage_* (kept runUsageError helper for main_test.go). Deleted e2e_authors_test.go and e2e_coupling_warn_test.go (subsumed; weakCouplingLog moved into golden_test.go). No exec suite (comment records why: no signals, no subprocesses). testdata/README.md and docs/specs/learnings.md updated; CHANGELOG Internal note added. No production code touched; make build green.

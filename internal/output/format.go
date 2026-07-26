@@ -17,7 +17,7 @@ import (
 // (exit 64): the value comes straight from a flag, so an unknown format is never
 // an internal fault.
 var errUnknownFormat = terr.New(
-	"usage_error", 64,
+	"unknown_format", 64,
 	"choose one of: json, ndjson, csv, table",
 	"unknown output format",
 )

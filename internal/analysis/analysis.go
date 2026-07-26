@@ -106,7 +106,11 @@ type Descriptor struct {
 	Flags []Flag
 	// RowSchema declares the columns each output row carries.
 	RowSchema []Column
-	// ErrorCodes lists the terr codes the analysis may return.
+	// ErrorCodes lists only the terr codes DISTINCTIVE to this analysis, beyond
+	// the common input, option, and output-layer codes every command can
+	// produce. Those baseline codes are reported once at tool level as a schema's
+	// CommonErrorCodes, so the full reachable surface is CommonErrorCodes plus
+	// this list.
 	ErrorCodes []string
 	// ExitCodes lists the process exit codes the command may produce.
 	ExitCodes []int

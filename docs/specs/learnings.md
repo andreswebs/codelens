@@ -1136,6 +1136,31 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
 - Step 5 (fleet `go.work` `use` entry) was a no-op here: no `go.work` exists in
   this environment. It applies only when building inside the fleet workspace.
 
+## ADR adoption 1/6: unique terr error codes (cod-uavr)
+
+- Supersedes the code strings recorded above (`io_error` in particular).
+  Breaking change: three codes were each carried by more than one sentinel, so
+  a consumer branching on the code could not distinguish unrelated failures.
+  All three groups resolved by RENAME, not collapse, because each site is a
+  genuinely different failure with a different hint and different `details`.
+  Old to new (exit codes unchanged): `parse_error` on `ErrControlChar` becomes
+  `invalid_control_char` (65); `usage_error` becomes `unknown_format` (64,
+  `--format`), `unknown_schema_command` (64, `schema --command`), and
+  `invalid_after_date` (64, `print-log-command --after`); `io_error` becomes
+  `log_open_failed` (74, `--log`) and `input_file_open_failed` (74,
+  `--group`/`--team-map`). `ErrParse` keeps `parse_error`.
+- `schema_version` stays at 1 (owner decision, responses.txt Q4), so the
+  envelope carries no version signal for this change; `CHANGELOG.md` (created
+  by this ticket) is the record.
+- One non-obvious cleanup: `internal/output/errors.go` had the string
+  `"usage_error"` in a doc comment (describing the class-distinguishing intent,
+  not a live code). The acceptance grep `usage_error\|io_error` over `*.go`
+  spans comments, so the comment was reworded to "a single opaque usage code".
+- Latent test weakness now fixed for free: `internal/gitlog/parse_test.go`'s
+  `assertCoded` compares by `Code()`, so the control-char assertion could have
+  passed even if `ErrParse` were returned; with a distinct code it is now
+  meaningful. No edit was needed.
+
 ## Migrate exit codes to the fleet taxonomy, ADR 0002 (cod-gwio)
 
 - Breaking change (v0.x). Old to new: usage 2 to 64 (EX_USAGE); data/content 3
@@ -1169,3 +1194,168 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   (`docs/skills/codelens/scripts/*`) carry their own `EXIT_USAGE`/empty-result
   conventions as downstream tools, and `learnings.md`'s historical entries
   record decisions as made at the time; neither is codelens's binary contract.
+
+## terr registry port: registering New vs runtime call sites (cod-8eis)
+
+- Adopting the reference `terr` registry meant `New` both constructs and
+  registers a sentinel, panicking on a duplicate code. The trap is not the
+  package-level `var X = terr.New(...)` declarations (those run once at init and
+  cod-uavr already made their codes unique) but any `terr.New` called inside a
+  function body. `cmd/codelens/main.go` builds the `unknown_command` error
+  inline in `run()`, and several `cmd/codelens` tests invoke unknown-command
+  paths in the same test binary; a registering `New` there registers on the
+  first call and panics on the second. The fix is `terr.Newf`, which formats but
+  does not register: it is the right home for one-off per-invocation errors
+  whose class is not part of the enumerable inventory. Grep for `terr.New(`
+  lines that are NOT `var ... = terr.New` before adopting a registering
+  constructor.
+- `Newf` takes a format string, so a call site that previously concatenated
+  user input into the message (`"unknown command: "+cmd`) must pass it as a `%s`
+  arg, not fold it into the format, or a `%` in the input would corrupt the
+  message.
+- The whole-binary registry guard belongs in `package main` (not an `internal`
+  package) because only the top-level binary links every sentinel-bearing
+  package; a subset test binary sees a subset of the registry. The asserted
+  count (18) is a tree-derived invariant: the guard carries a per-file
+  derivation comment so a future reader re-derives rather than trusts it, and it
+  fails closed when a sentinel is added without a unique snake_case code or an
+  ADR-0002 exit.
+- Converting the exit-3 / duplicate-code test fixtures to `Newf` is mandatory,
+  not cosmetic: under a registering `New`, a test binary that both links a
+  production `parse_error` sentinel and constructs its own `terr.New("parse_error", ...)`
+  fixture would panic at init. `Newf` keeps fixtures panic-free regardless of
+  what the binary links.
+
+## Descriptor error codes reconciled with the terr registry (cod-2x18)
+
+- ADR 0003 wants the documented error surface enumerable as data and unable to
+  drift from the sentinels that exist. The split that made this work: a
+  command's `error_codes` stays analysis-specific (no descriptor edits), a
+  tool-level `common_error_codes` baseline is declared once and copied into
+  every `CommandSchema` (analyses and meta commands alike), and `schema` (no
+  `--command`) gains an `errors` inventory built from `terr.All()`, sorted by
+  code. Both fields are additive, so `schema_version` stays at 1.
+- The ticket's own "expected members" list for `common_error_codes` conflicted
+  with its concrete acceptance criteria, and the criteria win. Two examples:
+  the prose listed `empty_log` and `parse_error` as candidates to exclude, but
+  the reverse-direction guard (every sentinel must be declared somewhere)
+  forces `parse_error` into the baseline because no descriptor declares it,
+  while `empty_log` stays out because every descriptor already carries it.
+  `unknown_command` looks like it belongs in the baseline but is excluded: it is
+  a `terr.Newf` (unregistered) pre-dispatch error, so admitting it would fail
+  the "sentinel or allowlist" guard, since criterion #5 pins the non-sentinel
+  allowlist to exactly the classifier codes plus `internal_error`. Derive
+  membership from the tree and let the conformance test settle the edges.
+- Two guards, not one, make the allowlist safe. The first ties every declared
+  code to a `terr.All()` sentinel or `output.NonSentinelCodes`; the second pins
+  `NonSentinelCodes` to `output.UsageClassCodes()` plus `InternalErrorCode`, so
+  the allowlist cannot become a place to hide a missing sentinel. Exposing the
+  classifier table as data (`UsageClassCodes`) is what lets the second guard
+  compare against the real classifier rather than a copy.
+- Import direction held: `internal/analysis` already imported `internal/output`
+  and adding `internal/terr` (which imports only `fmt`) introduced no cycle.
+  The non-sentinel codes (`log_open_failed` etc. live in `package main`, and the
+  classifier codes in `internal/output`) cannot be referenced from
+  `internal/analysis`, so `common_error_codes` is a string-literal declaration
+  whose correctness is enforced by the conformance test rather than by direct
+  reference to the sentinels.
+
+## ADR adoption 4/6: silent logging posture, remove --debug (cod-vsi0)
+
+- Supersedes the P1-1 entry above describing `--debug` and the `slog.JSONHandler`
+  trace. codelens adopts the ADR 0005 (local) SILENT posture: it is a
+  single-shot, read-only computational tool, so it carries no logging
+  infrastructure at all. `--debug`, the `log/slog` import, and the trace block
+  are deleted. The absence is the conformance evidence, not an omission.
+- The `--debug` logger was non-conformant on two counts, not merely unnecessary:
+  it logged the same error the envelope rendered one line later (ADR 0005 forbids
+  log records duplicating envelope content), and it was a root flag no descriptor
+  declared, so `schema --command CMD` never mentioned it (undiscoverable, which
+  defeats the schema-discovery contract).
+- Nothing was built to replace it: the machine-readable warning channel
+  (`output.EmitWarning`, wired through `analysis.Opts.Warn`) already carries
+  non-fatal advisories, and coded errors already carry failures.
+- Pinned the posture with a module-walking test (`TestNoLoggingImports`) that
+  parses every non-test `.go` file's imports and fails on `log` or `log/slog`.
+  `runtime/debug` (internal/version) is a distinct path and intentionally not
+  matched. A grep-only convention would not fail the build; a test does.
+- `--debug` was a ROOT flag, so urfave rejects it with `unknown_flag` whether it
+  appears before or after the subcommand name (`codelens --debug authors` and
+  `codelens authors --debug` both exit 64); the removal test pins both positions.
+- Swept the two EARS requirements mandating a debug option: retired the "include
+  diagnostic detail under debug" one and restated "never expose stack traces" as
+  unconditional. While that paragraph was open, also migrated its adjacent
+  pre-migration exit codes (2/3/1) to the ADR 0002 taxonomy (64/65/70), and the
+  plan.md success-criteria line likewise.
+
+## ADR adoption 5/6: CLI delegate behind the Deps seam (cod-q42s)
+
+- Moved the whole CLI delegate out of `package main` into a new `internal/command`
+  package (ADR 0004, local). `main` is now one line: it hands `os.Args[1:]` and
+  the process streams to `command.Run(args []string, deps command.Deps) int`.
+  `Deps` is `{In io.Reader, Out io.Writer, Err io.Writer}`; neither it nor `Run`
+  names a CLI-framework type, so the framework is confined to the package interior.
+- Args convention changed: `Run` takes args WITHOUT the program name, unlike the
+  old `run` (argv-style, including it). `runRoot` re-prepends `root.Name` before
+  calling urfave. Every test call site dropped its `"codelens"` element; a missed
+  drop eats the first real arg as the program name, so the conversion was
+  mechanical and the suite caught stragglers.
+- The package is split for replaceability: `run.go` is the framework-free
+  contract (imports no urfave); every other file is the interior. A no-leak test
+  enforces both halves of ADR 0004's rule: an import walk fails if any file
+  outside `internal/command` imports urfave, and an ast-level check over the
+  package's exported function signatures, struct fields, and type declarations
+  fails if any names a urfave type. The ast check is the load-bearing one; a full
+  type-resolution pass would be over-engineered for catching a framework type in
+  an exported signature.
+- The five per-construction-site `OnUsageError` assignments collapsed into one
+  recursive `neutralize(cmd)` that sets `OnUsageError` and `ExitErrHandler` on the
+  root and every subcommand (neither hook is inherited by urfave). The load-bearing
+  reasoning (suppressing urfave's help-topic routing, its "Incorrect Usage"
+  banner, and its `os.Exit`) moved with it.
+- Promoting the formerly-inline `unknown_command` to a registered sentinel, plus
+  three new classifier sentinels (`unknown_flag`, `invalid_value`,
+  `missing_required_flag`), raised the whole-binary sentinel count from 18 to 22
+  and left `internal_error` as the only non-sentinel code. The usage classifier
+  moved from `internal/output` into `internal/command/usage.go`; it still uses
+  `strings.Contains` with the original marker order (first match wins), and it
+  now returns a coded error that carries the sentinel's code/exit/hint but
+  PRESERVES the raw framework message, so the emitted envelope stays
+  byte-identical to when `output.EmitError` classified inline.
+- `unknown_command` is a pre-dispatch code attributable to no command, so it is
+  reported to agents only through the tool-level `errors` inventory (`terr.All()`,
+  surfaced by `schema`), never in a command's `error_codes` or the common
+  baseline. The reverse-direction registry guard exempts it explicitly rather
+  than forcing it into a per-command surface (which would have changed every
+  command's schema).
+- The CLI end-to-end harness (`internal/command/golden_test.go`) goldens a triple
+  per scenario: `<name>.out`, `<name>.err`, `<name>.exit` (ADR 0007). One golden
+  file per artifact keeps a stderr-only or exit-only change to a one-file diff,
+  which reads as the release note's evidence. An empty stderr is an empty file,
+  not an absent one; `checkArtifact` fails a missing golden with a message naming
+  `-update`, so a scenario can never pass by asserting against nothing.
+- One `goldenCases` table is the single source for both the golden comparison
+  (`TestGolden`) and the exit-code conformance guard
+  (`TestExitCodes_DeclaredCodesAreExercised`), which reads the exits the table
+  actually observes rather than a parallel list. That is the property that stops
+  the goldens and the exit-code coverage from drifting. Exit 70 stays the
+  documented exception: it is unreachable from well-formed CLI input, so it is
+  observed via `output.ExitCodeFor(errors.New(...))` (what `Run` calls to resolve
+  its exit) instead of an invented scenario.
+- Normalization runs before comparison AND before writing under `-update`, so a
+  volatile value can never enter a golden. The only volatile value in codelens is
+  the `t.TempDir()` path in the `log_open_failed` / `input_file_open_failed`
+  envelopes; a scenario writes the `<TMPDIR>` token in its args, the harness swaps
+  it for the real temp dir before the run, and swaps it back out of both streams
+  after. Verified by grepping the goldens for `/tmp`, `/Users`, `/private`, and
+  the repo path.
+- Ordering gotcha for the error scenarios: an empty stdin short-circuits to
+  `empty_log` (exit 65) before later validation runs, so `unknown_format` and
+  `input_file_open_failed` need a valid log on stdin to reach their own failure;
+  `log_open_failed` fails at file-open before any read, so its stdin is
+  irrelevant.
+- No exec-based end-to-end suite: ADR 0007 makes one conditional on process-level
+  behavior in-process tests cannot reach (signals and 130/143, subprocess
+  lifecycles, child exit-status passthrough). codelens catches no signals and
+  spawns no subprocesses, so the omission is a decision, recorded in a comment on
+  the `goldenCase` type.

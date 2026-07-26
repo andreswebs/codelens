@@ -44,9 +44,19 @@ inflate. Resolve aliases in this order:
 Never guess flags or column names.
 
 ```sh
-codelens schema                     # every command, aliases, exit codes
-codelens schema --command coupling  # summary, flags, row_schema, error_codes, exit_codes
+codelens schema                     # every command, aliases, exit codes, error inventory
+codelens schema --command coupling  # summary, flags, row_schema, error_codes, common_error_codes, exit_codes
 ```
+
+`schema` (no `--command`) also carries an `errors` inventory: every error the
+binary can emit as `{code, exit_code, hint}`, sorted by code, so an agent can
+map any code it sees to its exit code and remedy without a second lookup.
+
+`schema --command` reports the error surface as two lists. `error_codes` is only
+the codes distinctive to that command; `common_error_codes` is the tool-level
+baseline any invocation can produce (input, global-option, and output-layer
+failures), reported identically on every command. Enumerate a command's full
+error surface as `error_codes + common_error_codes`.
 
 `schema --command` is authoritative, including columns that appear only with
 `--verbose`. It also describes the helper commands themselves
@@ -219,7 +229,7 @@ Exit codes follow the family-wide taxonomy in ADR 0002 (BSD `sysexits.h`):
 | 0    | success (incl. empty) | any analysis that ran                                                 |
 | 64   | usage error           | unknown flag/subcommand, bad value, `messages` without `--expression`, malformed glob/group |
 | 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat |
-| 70   | internal              | a bug; prints a trace only under `--debug`                            |
+| 70   | internal              | a bug; an unexpected internal fault, reported as a one-line coded error |
 | 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                   |
 
 Non-fatal advisories are emitted as single-line JSON **warning** diagnostics on

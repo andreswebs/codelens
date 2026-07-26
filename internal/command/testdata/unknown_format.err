@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"error":{"code":"unknown_format","message":"unknown output format","hint":"choose one of: json, ndjson, csv, table","details":{"format":"bogus"}}}

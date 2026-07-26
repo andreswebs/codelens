@@ -114,7 +114,7 @@ Summary, Flags, RowSchema, ErrorCodes, Run(func([]Modification, Opts)
   count; sort `[n-authors, n-revs]` desc. Row schema with descriptions.
 - **P2-3 CLI subcommand generation.** Build one `cli.Command` per registered
   descriptor (registering its aliases); attach global flags (`--log`,
-  `--format`, `--fields`, `--rows`, `--input-encoding`, `--debug`, `--group`,
+  `--format`, `--fields`, `--rows`, `--input-encoding`, `--group`,
   `--group-format`, `--team-map`, `--team-map-format`, `--temporal-period`) and
   the descriptor's per-command flags. Read stdin by default.
 - **P2-4 Output formats (generic).** `--format json|ndjson|csv|table`:
@@ -288,8 +288,8 @@ P4/P5 ─> P6 (docs reflect final surface)
 2. `codelens schema` and `schema --command CMD` are fully self-describing
    (flags, row_schema, error/exit codes) for every command.
 3. `print-log-command` and `version`/`--version` implemented.
-4. Errors on stderr as coded envelopes; exit codes 0/2/3/1 as specified; traces
-   only under `--debug`.
+4. Errors on stderr as coded envelopes; exit codes 0/64/65/70/74 per ADR 0002;
+   no stack traces ever (silent logging posture, ADR 0005).
 5. Ported fixtures pass; JSON goldens are the contract, csv spot-checks pass.
 6. `AGENTS.md` + skill + README + CLAUDE.md complete.
 7. `make build` (validate + compile) green; GPL-3.0 headers/attribution on

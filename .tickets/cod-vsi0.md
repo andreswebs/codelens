@@ -1,6 +1,6 @@
 ---
 id: cod-vsi0
-status: open
+status: closed
 deps: [cod-2x18]
 links: [cod-pp0d, cod-8eis, cod-q42s, cod-uavr, cod-2x18]
 created: 2026-07-26T18:40:26Z
@@ -226,3 +226,9 @@ Markdownlint every markdown file touched:
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T19:15:59Z**
+
+Adopted ADR 0005 (local) SILENT logging posture; removed --debug and all logging. Changes: deleted log/slog import, var debug, and the trace block from cmd/codelens/main.go; removed the --debug BoolFlag and updated globalFlags(format) signature+doc in cmd/codelens/commands.go. Tests: deleted TestRun_DebugFlag_Parsed and TestRun_DebugTraceOnlyUnderDebug; added TestRun_DebugFlagRemoved (pins unknown_flag for both 'codelens --debug authors' and 'codelens authors --debug' since --debug was a root flag); added new cmd/codelens/logging_posture_test.go::TestNoLoggingImports which parses every non-test .go file in the module and fails on any 'log' or 'log/slog' import (runtime/debug intentionally not matched). ADR: amended docs/adr/0005-logging.md with a 'Posture chosen' subsection. Docs swept: cli-design.md (flags table row removed, exit-70 + audit-findings rows reworded), README.md exit-70 row, operating.md exit-70 row, plan.md (flag list + success criteria), requirements.md (retired the debug-detail EARS req, restated the no-traces one as unconditional). OPTIONAL fix done: while requirements.md's exit-code paragraph was open, migrated its stale pre-migration exit codes 2/3/1 to the ADR 0002 taxonomy 64/65/70. learnings.md: APPENDED a superseding entry (did not rewrite the P1-1 --debug entry). CHANGELOG.md: added a breaking 'Removed' entry. make build green; all markdown markdownlint-clean. NOTE for reviewer: the working tree already carried uncommitted work from prior tickets (cod-uavr/cod-8eis/cod-2x18: schema.go, terr.go, metacommands.go, CHANGELOG.md, and the cmd/codelens/testdata/authors.schema.json golden gaining common_error_codes). That golden diff is cod-2x18's, NOT this ticket's; --debug never appeared in any schema, so removing it cannot alter schema output. No commits made.

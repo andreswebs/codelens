@@ -25,8 +25,10 @@ var (
 	// ErrControlChar marks input containing a disallowed control character (such
 	// as NUL). Tab is permitted because numstat fields are tab-separated; the
 	// line terminator is consumed by the tokenizer and never reaches this check.
+	// It is a data error (exit 65): the offending bytes are user-supplied log
+	// content, so the fault is in the data, never internal.
 	ErrControlChar = terr.New(
-		"parse_error", 65,
+		"invalid_control_char", 65,
 		"the input contains disallowed control characters",
 		"invalid control character in input",
 	)

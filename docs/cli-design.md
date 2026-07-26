@@ -98,7 +98,6 @@ for code-maat's "global flag that no-ops for 19 of 20 analyses" problem.
 | `--team-map FILE`       | -       | author→team map                                   |
 | `--team-map-format FMT` | `csv`   | `csv` or `json`                                   |
 | `--temporal-period N`   | -       | Collapse commits into sliding N-day change sets   |
-| `--debug`               | off     | Emit stack traces / verbose diagnostics to stderr |
 
 Format for `--group`/`--team-map` is chosen by an **explicit** `*-format` flag
 (no content sniffing or extension guessing), defaulting to the text/CSV form.
@@ -303,10 +302,10 @@ codelens follows the family-wide taxonomy in
 | Code | Code string(s)                                              | Meaning                     | Examples                                                                                    |
 | ---- | ----------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- |
 | 0    | -                                                           | success (incl. empty result) | any analysis that ran                                                                       |
-| 64   | `usage_error`, `unknown_command`, `unknown_flag`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now` | usage error (EX_USAGE) | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group |
-| 65   | `parse_error`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map` | data error (EX_DATAERR) | unparseable or empty log, malformed `--team-map`, churn analysis on a log with no numstat |
-| 70   | `internal_error`                                            | internal / unexpected (EX_SOFTWARE) | bug; only path that prints a trace (with `--debug`)                                 |
-| 74   | `io_error`                                                  | I/O error (EX_IOERR)        | unreadable `--log`, `--group`, or `--team-map` file                                         |
+| 64   | `unknown_command`, `unknown_flag`, `unknown_format`, `unknown_schema_command`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now`, `invalid_after_date` | usage error (EX_USAGE) | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group |
+| 65   | `parse_error`, `invalid_control_char`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map` | data error (EX_DATAERR) | unparseable or empty log, disallowed control character, malformed `--team-map`, churn analysis on a log with no numstat |
+| 70   | `internal_error`                                            | internal / unexpected (EX_SOFTWARE) | a bug; an unexpected internal fault, reported as a one-line coded error like any other |
+| 74   | `log_open_failed`, `input_file_open_failed`                | I/O error (EX_IOERR)        | unreadable `--log`, `--group`, or `--team-map` file                                         |
 
 Coded errors carry a stable string `code` and their own exit code via a
 dedicated `terr`-style package. Usage errors from the CLI framework are
@@ -315,7 +314,9 @@ classified from its messages; all resolve to exit 64.
 ## 8. Schema introspection
 
 - `codelens schema` - lists all commands with one-line descriptions and their
-  exit-code sets.
+  exit-code sets, plus an `errors` inventory: every error the binary can emit as
+  `{code, exit_code, hint}`, derived from the coded-error registry (so it cannot
+  drift from the sentinels that exist) and sorted by code.
 - `codelens schema --command CMD` - full, self-describing contract for `CMD`:
 
 ```json
@@ -360,7 +361,24 @@ classified from its messages; all resolve to exit 64.
       "desc": "avg revisions of the pair (ceil)"
     }
   ],
-  "error_codes": ["parse_error", "empty_log"],
+  "error_codes": ["empty_log"],
+  "common_error_codes": [
+    "input_file_open_failed",
+    "internal_error",
+    "invalid_control_char",
+    "invalid_field",
+    "invalid_glob",
+    "invalid_group",
+    "invalid_team_map",
+    "invalid_temporal_date",
+    "invalid_temporal_period",
+    "invalid_value",
+    "log_open_failed",
+    "missing_required_flag",
+    "parse_error",
+    "unknown_flag",
+    "unknown_format"
+  ],
   "exit_codes": [0, 64, 65, 70, 74]
 }
 ```
@@ -373,6 +391,16 @@ giving downstream renderers the semantics they need. `shape` declares the payloa
 topology. The `schema` command is what lets an agent learn a command entirely at
 runtime.
 
+`error_codes` and `common_error_codes` split the error surface in two.
+`error_codes` carries only the codes distinctive to this command (for example
+`messages` adds `invalid_expression` and `missing_messages`), while
+`common_error_codes` is the tool-level baseline any invocation can produce: the
+input, global-option, and output-layer failures, declared once and reported the
+same on every command (analyses and helpers alike). An agent enumerates a
+command's full reachable error surface as `error_codes + common_error_codes`.
+The log-input code `empty_log` stays in `error_codes`; the baseline excludes it
+to avoid double-reporting.
+
 `CMD` covers the meta commands too: `schema --command schema|print-log-command`
 returns each helper's contract (flags, error/exit codes) so nothing the binary
 exposes is off the introspection path. Helpers take no log and emit no rows, so
@@ -382,8 +410,13 @@ flag (bare output), not a subcommand, so it is not on the `schema` path.
 ## 9. Architecture
 
 ```text
-cmd/codelens/            main; wires urfave/cli commands
+cmd/codelens/            one-line main; hands os.Args[1:] + streams to command.Run
 internal/
+  command/               CLI delegate behind the Deps seam (ADR 0004):
+                         run.go (framework-free contract), root/commands/
+                         schema/printlogcommand (framework interior), usage.go
+                         (usage-error classifier), errors.go (CLI-surface
+                         sentinels), registry.go (ExitCodes)
   version/               (exists) build version
   terr/                  coded errors (code, message, hint, exit)
   output/                envelope build, JSON emit, fields, registry, schema
@@ -429,7 +462,7 @@ Design points:
 | code-maat finding                 | codelens resolution                                                         |
 | --------------------------------- | --------------------------------------------------------------------------- |
 | Errors/traces on stdout           | All diagnostics on stderr; stdout is results only                           |
-| Stack traces leaked to users      | Traces only under `--debug`; otherwise one-line coded error                 |
+| Stack traces leaked to users      | No traces ever; every failure is a one-line coded error (silent posture)    |
 | No `--version`                    | `codelens --version` prints the bare build version                          |
 | Opaque `is it a valid logfile?`   | Named `parse_error` with entry/line `details` + hint to `print-log-command` |
 | Input contract undiscoverable     | `codelens print-log-command` emits the exact git command                    |

@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"error":{"code":"unknown_command","message":"unknown command","hint":"run `codelens --help` to list available commands","details":{"command":"frobnicate"}}}

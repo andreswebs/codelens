@@ -68,6 +68,21 @@ This is mandatory wherever the tool handles credentials and
 inapplicable elsewhere. Logging is where credentials leak first, which
 is why the rule lives in this ADR.
 
+### Posture chosen
+
+codelens adopts the silent posture. It is a single-shot computational tool: it
+reads a git log on stdin, runs one analysis, and exits. It opens no network
+connections, spawns no subprocesses, runs no daemon, and is strictly read-only
+(it never runs git). Coded errors (see the error-handling ADR) are the failure
+channel, and advisories flow through the machine-readable warning channel on
+stderr (`output.EmitWarning`, injected into analyses as `analysis.Opts.Warn`).
+
+The tool therefore carries no logging infrastructure: no `log/slog` import, no
+`--log-level`, `--quiet`, or `--log-format` flag, no `<TOOL>_LOG_LEVEL`
+variable, no handler selection, and no `logctx` package. Their absence is the
+conformance evidence for this posture and is pinned by a test that fails if any
+non-test file imports a logging package.
+
 ## Consequences
 
 - An agent piping the tool gets JSON diagnostics and a clean result

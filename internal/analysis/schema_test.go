@@ -139,7 +139,7 @@ func TestMetaSchema_BuildsAndNormalizes(t *testing.T) {
 	flags := []Flag{
 		{Name: "command", Type: "string", Desc: "describe a single CMD"},
 	}
-	got := MetaSchema("schema", "describe commands", flags, []string{"usage_error"}, []int{0, 64})
+	got := MetaSchema("schema", "describe commands", flags, []string{"unknown_schema_command"}, []int{0, 64})
 
 	if got.SchemaVersion != output.SchemaVersion || !got.OK {
 		t.Errorf("envelope = %+v, want ok/version set", got)
@@ -153,8 +153,8 @@ func TestMetaSchema_BuildsAndNormalizes(t *testing.T) {
 	if len(got.Flags) != 1 || got.Flags[0].Name != "command" {
 		t.Errorf("Flags = %+v, want one command flag", got.Flags)
 	}
-	if !equalStringsA(got.ErrorCodes, []string{"usage_error"}) {
-		t.Errorf("ErrorCodes = %v, want [usage_error]", got.ErrorCodes)
+	if !equalStringsA(got.ErrorCodes, []string{"unknown_schema_command"}) {
+		t.Errorf("ErrorCodes = %v, want [unknown_schema_command]", got.ErrorCodes)
 	}
 	if !equalIntsA(got.ExitCodes, []int{0, 64}) {
 		t.Errorf("ExitCodes = %v, want [0 64]", got.ExitCodes)

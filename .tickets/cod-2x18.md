@@ -1,6 +1,6 @@
 ---
 id: cod-2x18
-status: open
+status: closed
 deps: [cod-8eis]
 links: [cod-pp0d, cod-8eis, cod-q42s, cod-uavr, cod-vsi0]
 created: 2026-07-26T18:39:30Z
@@ -257,3 +257,9 @@ report it as a failure and resolve it rather than weakening the test.
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T19:10:16Z**
+
+Reconciled the descriptor error-code enumeration with the terr registry per ADR 0003. Added two additive schema fields (schema_version stays 1): (1) common_error_codes on CommandSchema — a tool-level baseline of the 15 codes any invocation can produce (input/global-option/output-layer failures), declared once as analysis.commonErrorCodes and copied into both Schema() and MetaSchema(); a command's error_codes now carries only its distinctive codes. (2) errors inventory on CommandList (schema, no --command) — {code,exit_code,hint} for all 18 registered sentinels, built from terr.All() and sorted by code, so it cannot drift from the sentinels. Followed the recommendation to make NO descriptor edits: empty_log stays per-analysis and is excluded from the baseline; parse_error IS in the baseline (no descriptor declares it, and the reverse-direction guard requires every sentinel be declared somewhere). unknown_command is deliberately excluded from the baseline: it is a terr.Newf (unregistered) pre-dispatch error and would fail the sentinel-or-allowlist guard. Guards: TestErrorCodes_DeclaredCodesExist (every declared code is a terr.All() sentinel or in output.NonSentinelCodes; reverse: every sentinel is declared somewhere) and TestNonSentinelAllowlist_MatchesClassifier (NonSentinelCodes == output.UsageClassCodes()+InternalErrorCode, so a new classifier entry without an allowlist update fails). Both fail-closed; demonstrated during dev then reverted. New data in internal/output/errors.go: NonSentinelCodes, InternalErrorCode, UsageClassCodes(). Docs: cli-design.md, operating.md, CHANGELOG.md, learnings.md. Golden authors.schema.json regenerated (only the additive field). NOTE: the working tree also carries uncommitted work from closed deps cod-8eis/cod-uavr (owner owns commits); left dirty for review per instructions. make build green.

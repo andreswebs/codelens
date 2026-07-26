@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"error":{"code":"invalid_after_date","message":"invalid --after date: parsing time \"notadate\" as \"2006-01-02\": cannot parse \"notadate\" as \"2006\"","hint":"pass the date as YYYY-MM-DD, e.g. --after=2024-01-01","details":{"after":"notadate"}}}

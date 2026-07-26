@@ -184,7 +184,7 @@ func parseOK(t *testing.T, in string) []model.Modification {
 // assertCoded fails unless err is a coded error reporting the same code and
 // exit code as the wanted sentinel. Codes are compared rather than pointer
 // identity because Wrap/WithDetails return copies of the sentinel.
-func assertCoded(t *testing.T, err error, want *terr.Error, wantExit int) {
+func assertCoded(t *testing.T, err error, want *terr.E, wantExit int) {
 	t.Helper()
 
 	if err == nil {

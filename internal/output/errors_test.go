@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/andreswebs/codelens/internal/output"
@@ -12,7 +11,7 @@ import (
 )
 
 func TestEmitError_JSON_Coded(t *testing.T) {
-	err := terr.New("parse_error", 3, "run print-log-command", "bad log")
+	err := terr.Newf("parse_error", 65, "run print-log-command", "bad log")
 
 	var buf bytes.Buffer
 	output.EmitError(&buf, err)
@@ -52,8 +51,7 @@ func TestEmitError_AlwaysJSON(t *testing.T) {
 		err      error
 		wantCode string
 	}{
-		{"coded", terr.New("parse_error", 3, "run print-log-command", "bad log"), "parse_error"},
-		{"usage classified", errors.New("flag provided but not defined: -bogus"), "unknown_flag"},
+		{"coded", terr.Newf("parse_error", 65, "run print-log-command", "bad log"), "parse_error"},
 		{"plain", errors.New("boom"), "internal_error"},
 	}
 	for _, tt := range tests {
@@ -89,7 +87,7 @@ func TestEmitError_AlwaysJSON(t *testing.T) {
 }
 
 func TestEmitError_Details(t *testing.T) {
-	base := terr.New("parse_error", 3, "", "bad entry")
+	base := terr.Newf("parse_error", 65, "", "bad entry")
 	err := base.WithDetails(map[string]any{"entry": 4, "line": "foo"})
 
 	var buf bytes.Buffer
@@ -118,58 +116,13 @@ func TestExitCodeFor(t *testing.T) {
 		want int
 	}{
 		{"nil", nil, 0},
-		{"coded exit 65", terr.New("data_error", 65, "", "empty log"), 65},
-		{"usage error", errors.New("flag provided but not defined: -bogus"), 64},
-		{"wrapped usage error", fmt.Errorf("x: %w", errors.New("no such flag -q")), 64},
+		{"coded exit 65", terr.Newf("empty_log", 65, "", "empty log"), 65},
 		{"generic", errors.New("boom"), 70},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := output.ExitCodeFor(tt.err); got != tt.want {
 				t.Errorf("ExitCodeFor(%v) = %d, want %d", tt.err, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestEmitError_UsageErrorClassified(t *testing.T) {
-	tests := []struct {
-		name     string
-		msg      string
-		wantCode string
-	}{
-		{"unknown flag", "flag provided but not defined: -bogus", "unknown_flag"},
-		{"no such flag", "no such flag -q", "unknown_flag"},
-		{"invalid value", `invalid value "abc" for flag -rows: strconv.ParseInt: parsing "abc": invalid syntax`, "invalid_value"},
-		{"required flag", `Required flag "expression" not set`, "missing_required_flag"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			output.EmitError(&buf, errors.New(tt.msg))
-
-			var env struct {
-				OK    bool `json:"ok"`
-				Error struct {
-					Code    string `json:"code"`
-					Message string `json:"message"`
-					Hint    string `json:"hint"`
-				} `json:"error"`
-			}
-			if e := json.Unmarshal(buf.Bytes(), &env); e != nil {
-				t.Fatalf("unmarshal: %v\ngot: %s", e, buf.String())
-			}
-			if env.OK {
-				t.Errorf("ok = true, want false")
-			}
-			if env.Error.Code != tt.wantCode {
-				t.Errorf("code = %q, want %q", env.Error.Code, tt.wantCode)
-			}
-			if env.Error.Hint == "" {
-				t.Errorf("hint should be non-empty for a usage error, got envelope: %s", buf.String())
-			}
-			if env.Error.Message != tt.msg {
-				t.Errorf("message = %q, want the underlying text %q", env.Error.Message, tt.msg)
 			}
 		})
 	}

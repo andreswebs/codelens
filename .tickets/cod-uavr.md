@@ -1,6 +1,6 @@
 ---
 id: cod-uavr
-status: open
+status: closed
 deps: []
 links: [cod-pp0d, cod-8eis, cod-q42s, cod-2x18, cod-vsi0]
 created: 2026-07-26T18:21:56Z
@@ -207,3 +207,9 @@ migrate. Later tickets in this set append to the same `Unreleased` section.
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T18:55:58Z**
+
+Renamed 6 sentinels to unique codes (exit codes unchanged): ErrControlChar parse_error->invalid_control_char (65); errUnknownFormat usage_error->unknown_format (64); errUnknownSchemaCommand usage_error->unknown_schema_command (64); errBadAfter usage_error->invalid_after_date (64); errLogOpen io_error->log_open_failed (74); errFileOpen io_error->input_file_open_failed (74). ErrParse keeps parse_error. Updated metacommands.go ErrorCodes (print-log-command->invalid_after_date, schema->unknown_schema_command). Reworded a doc comment in internal/output/errors.go that contained the literal string 'usage_error' so the *.go acceptance grep is clean. Updated contract tests in pipeline_e2e/schema/printlogcommand/metacommands tests and the MetaSchema fixture in internal/analysis/schema_test.go. Docs: cli-design.md exit-code table (64/65/74 rows), created CHANGELOG.md (Keep a Changelog, Unreleased/Changed with the full old->new mapping), appended a superseding learnings entry. Verified all 6 acceptance scenarios emit the new code with the correct exit code, conformance tests pass, grep sweeps clean. Remaining docs/skills grep hits are Python test METHOD NAMES (test_bad_glob_is_usage_error) asserting EXIT_USAGE and the unchanged invalid_glob code - out of scope (downstream render scripts) and not the codelens code string. make build green. Work tree left dirty per DO NOT COMMIT.

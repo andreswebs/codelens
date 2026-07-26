@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"error":{"code":"input_file_open_failed","message":"cannot open input file: open <TMPDIR>/missing.txt: no such file or directory","hint":"check that the file path exists and is readable","details":{"flag":"group","path":"<TMPDIR>/missing.txt"}}}

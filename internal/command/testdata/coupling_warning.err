@@ -1,0 +1,1 @@
+{"schema_version":1,"level":"warning","code":"coupling_all_filtered","message":"0 pairs met the coupling thresholds","hint":"highest observed coupling was 29%; lower --min-coupling (currently 30) to see weaker links","details":{"candidate_pairs":1,"max_degree":29,"min_coupling":30}}

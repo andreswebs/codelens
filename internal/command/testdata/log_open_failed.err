@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"error":{"code":"log_open_failed","message":"cannot open log file: open <TMPDIR>/missing.log: no such file or directory","hint":"check that the --log path exists and is readable","details":{"path":"<TMPDIR>/missing.log"}}}

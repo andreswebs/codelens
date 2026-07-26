@@ -1,6 +1,6 @@
 ---
 id: cod-8eis
-status: open
+status: closed
 deps: [cod-uavr]
 links: [cod-pp0d, cod-q42s, cod-uavr, cod-2x18, cod-vsi0]
 created: 2026-07-26T18:37:18Z
@@ -265,3 +265,13 @@ Markdownlint the README edit:
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T19:00:57Z**
+
+Ported terr registry half to match the reference surface: renamed Error->E, added a package-level registry, a registering New that panics with 'terr: duplicate error code %q' on dup codes, non-registering Newf, All() (returns a copy in registration order), and an Is that matches by code (so Wrap/WithDetails copies match their sentinel under errors.Is). Field wrapped->cause.
+
+CRITICAL FINDING (not called out in the ticket's fixture list): cmd/codelens/main.go:65 calls terr.New('unknown_command',...) at RUNTIME inside run(), not as a package-level var. Multiple cmd/codelens tests invoke unknown-command paths in the same test binary (main_test.go bogus/version x3, commands_test.go authorz), so a registering New would register once then panic on the second call. Converted it to terr.Newf (a per-invocation error, exactly Newf's purpose) with a %s format arg for the command name. Zero envelope/golden change; goldens byte-identical. cod-q42s will promote it to a real sentinel later, raising All()'s count.
+
+Whole-binary guard (cmd/codelens/registry_guard_test.go, package main): asserts terr.All()==18, re-derived from the tree and documented in a comment with the per-file breakdown; no duplicate codes; every exit in {0,64,65,70,74}; every code snake_case. Fixtures converted: terr_test.go and output/errors_test.go exit-3/duplicate-code fixtures moved to Newf with production exit codes; output/errors_test.go 'data_error' -> real code 'empty_log'. Stale 'family-wide' wording fixed in errors.go:14 and README.md:250 only (the two the ticket scoped); docs/cli-design.md and operating.md still say it but were out of scope. make build green.

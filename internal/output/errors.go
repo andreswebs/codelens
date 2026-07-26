@@ -5,18 +5,32 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/andreswebs/codelens/internal/terr"
 )
 
-// exitUsage and exitInternal are the non-success process exit codes resolved
-// here from the family-wide taxonomy (ADR 0002): 64 EX_USAGE and 70 EX_SOFTWARE.
-// Data (65) and I/O (74) exits are carried by coded errors themselves.
-const (
-	exitUsage    = 64
-	exitInternal = 70
-)
+// exitInternal is the non-success process exit code resolved here for an error
+// carrying no code of its own, from the exit-code taxonomy (ADR 0002): 70
+// EX_SOFTWARE. Usage (64), data (65), and I/O (74) exits are carried by coded
+// errors themselves; usage errors are classified into coded errors upstream, in
+// internal/command, before they reach this resolver.
+const exitInternal = 70
+
+// InternalErrorCode is the code stamped on the uncoded internal-fault fallback
+// (exit 70). It is not backed by a terr sentinel: it is the code of last resort
+// for an error that carries none, so it lives here beside the resolver that
+// applies it rather than in the sentinel registry.
+const InternalErrorCode = "internal_error"
+
+// NonSentinelCodes is the closed set of error codes codelens can emit that are
+// not backed by a terr sentinel, and so cannot appear in terr.All(). Since the
+// usage classes became registered sentinels (in internal/command), the only
+// remaining member is the internal-fault fallback stamped here for an uncoded
+// error. It is the allowlist a schema conformance test checks declared codes
+// against once the sentinel registry has been exhausted.
+var NonSentinelCodes = []string{
+	InternalErrorCode,
+}
 
 type errorEnvelope struct {
 	SchemaVersion int          `json:"schema_version"`
@@ -31,11 +45,11 @@ type errorDetail struct {
 	Details any    `json:"details,omitempty"`
 }
 
-// EmitError writes err to w as the JSON error envelope, always, regardless of
-// the --format value: --format governs the results on stdout, not diagnostics on
-// stderr. Code, hint, and details come from the error's coded and detailed
-// interfaces when present, falling back to usage classification for uncoded
-// CLI-framework errors and to an internal-error code otherwise.
+// EmitError writes err to w as the JSON error envelope, always. Code, hint, and
+// details come from the error's coded and detailed interfaces when present,
+// falling back to an internal-error code otherwise. Usage errors are already
+// coded by the time they reach here: internal/command classifies uncoded
+// framework parse errors into coded usage errors before emitting.
 //
 // The write is best-effort: w is the diagnostic sink (stderr) and a failure to
 // write there is unrecoverable, so the write error is intentionally discarded.
@@ -56,7 +70,7 @@ func render(d *errorDetail) string {
 }
 
 // detailFor derives the rendered error detail from err, preferring a coded
-// error's own code/hint/details and falling back to usage or internal codes.
+// error's own code/hint/details and falling back to the internal-error code.
 func detailFor(err error) *errorDetail {
 	d := &errorDetail{Message: err.Error()}
 
@@ -71,18 +85,14 @@ func detailFor(err error) *errorDetail {
 		return d
 	}
 
-	if code, hint := classifyUsageError(err); code != "" {
-		d.Code = code
-		d.Hint = hint
-		return d
-	}
-
-	d.Code = "internal_error"
+	d.Code = InternalErrorCode
 	return d
 }
 
 // ExitCodeFor resolves the process exit code for err: 0 for nil, a coded
-// error's own exit code, 64 for a classified usage error, and 70 otherwise.
+// error's own exit code, and 70 (internal fault) for an uncoded error. Usage
+// errors are coded upstream (internal/command), so they arrive as coded errors
+// and resolve to their own exit code here.
 func ExitCodeFor(err error) int {
 	if err == nil {
 		return 0
@@ -91,36 +101,5 @@ func ExitCodeFor(err error) int {
 	if errors.As(err, &coded) {
 		return coded.ExitCode()
 	}
-	if code, _ := classifyUsageError(err); code != "" {
-		return exitUsage
-	}
 	return exitInternal
-}
-
-// usageClasses maps substrings of the urfave/cli v3 parsing messages to the
-// coded error each represents. Every entry is an exit-64 usage error; the code
-// distinguishes the class (an unknown/undefined flag, a bad flag value, or a
-// missing required flag) so an agent can react to the specific failure rather
-// than a single opaque "usage_error". Order is significant: the first matching
-// marker wins, so more specific markers precede more general ones.
-var usageClasses = []struct{ marker, code, hint string }{
-	{"flag provided but not defined", "unknown_flag", "run `codelens <command> --help` to list valid flags"},
-	{"no such flag", "unknown_flag", "run `codelens <command> --help` to list valid flags"},
-	{"invalid value", "invalid_value", "run `codelens <command> --help` for accepted flag values"},
-	{"Required flag", "missing_required_flag", "run `codelens <command> --help` to see required flags"},
-	{"not set", "missing_required_flag", "run `codelens <command> --help` to see required flags"},
-}
-
-// classifyUsageError reports the usage code and hint when err's message matches
-// a known CLI-framework parsing error, or ("", "") when it does not. Unknown
-// commands are classified upstream (they never reach the framework's flag
-// parser) and so are not covered here.
-func classifyUsageError(err error) (code, hint string) {
-	msg := err.Error()
-	for _, c := range usageClasses {
-		if strings.Contains(msg, c.marker) {
-			return c.code, c.hint
-		}
-	}
-	return "", ""
 }

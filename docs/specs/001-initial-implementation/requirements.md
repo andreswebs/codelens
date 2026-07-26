@@ -234,14 +234,14 @@ distinguishable by category, so that I can branch on outcomes reliably.
 - WHEN an invocation succeeds, the system shall exit with status 0, including
   when the result set is empty.
 - IF an invocation has a usage error (unknown command or option, missing or
-  invalid option value), THEN the system shall exit with status 2.
+  invalid option value), THEN the system shall exit with status 64 (EX_USAGE).
 - IF an invocation has an input error (unparseable, empty, or unsuitable log, or
-  a malformed grouping or team mapping), THEN the system shall exit with status 3.
-- IF an invocation fails unexpectedly, THEN the system shall exit with status 1.
-- WHILE a debug option is enabled, the system shall include diagnostic detail
-  (such as stack traces) on the error stream.
-- WHILE a debug option is not enabled, the system shall not expose internal
-  stack traces to the user.
+  a malformed grouping or team mapping), THEN the system shall exit with status
+  65 (EX_DATAERR).
+- IF an invocation fails unexpectedly, THEN the system shall exit with status 70
+  (EX_SOFTWARE).
+- The system shall not expose internal stack traces to the user; every failure
+  is reported as a one-line coded error envelope on the error stream.
 
 ### 11. Help and versioning
 

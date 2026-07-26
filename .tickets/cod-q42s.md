@@ -1,6 +1,6 @@
 ---
 id: cod-q42s
-status: open
+status: closed
 deps: [cod-vsi0]
 links: [cod-pp0d, cod-8eis, cod-uavr, cod-2x18, cod-vsi0]
 created: 2026-07-26T18:42:01Z
@@ -366,3 +366,9 @@ schema change (the inventory got more complete), not a regression.
 - DO NOT COMMIT. The owner owns all git operations: no commits, no branches,
   no staging. Leave the work tree dirty for review.
 
+
+## Notes
+
+**2026-07-26T19:34:41Z**
+
+Moved the CLI delegate from package main into internal/command behind the Deps seam (ADR 0004). main is now one line handing os.Args[1:] + streams to command.Run(args []string, deps command.Deps) int; Deps={In,Out,Err} names no framework type. run.go is the framework-free contract; root/commands/metacommands/schema/printlogcommand are the interior; usage.go holds the relocated usage-error classifier (still strings.Contains, original marker order, now returns a coded error preserving the raw framework message so envelopes stay byte-identical); errors.go gathers the CLI-surface sentinels; registry.go declares ExitCodes as data. Promoted unknown_command to a registered sentinel and added 3 classifier sentinels (unknown_flag/invalid_value/missing_required_flag): whole-binary sentinel count 18->22, non-sentinel allowlist reduced to internal_error alone. output.ExitCodeFor now returns 70 for an uncoded error; the classifier is gone from internal/output. Two no-leak tests enforce ADR 0004 (import walk + ast check over exported signatures); demonstrated the ast check fails on a deliberate leak then reverted. All 13 test files + testdata moved to internal/command; 45 run() sites converted to Run(...,Deps{}) dropping the program-name arg. reverse-direction registry guard exempts pre-dispatch unknown_command (reported only via the schema errors inventory). Result-envelope goldens byte-identical (TestE2E_Authors green). make build green. NOTE: working tree was already dirty at session start (prior closed tickets' uncommitted changes incl. a regenerated authors.schema.json with common_error_codes); left those untouched. DID NOT COMMIT.
