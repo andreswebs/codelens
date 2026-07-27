@@ -147,7 +147,7 @@ FULL=(--log "${OUT}/git-full.log")
 run_analysis() {
     local analysis="${1}" outfile="${2}"
     shift 2
-    codelens "${analysis}" "${@}" --format json >"${OUT}/${outfile}" \
+    codelens "${analysis}" "${@}" >"${OUT}/${outfile}" \
         2>"${OUT}/${analysis}.stderr" ||
         echo_stderr "[${REPO_NAME}] analysis ${analysis} failed (see ${analysis}.stderr)"
 }
@@ -166,7 +166,7 @@ run_analysis absolute-churn abs-churn.json "${WIN[@]}" "${EXCLUDES[@]}"
 run_analysis entity-effort effort.json "${WIN[@]}" "${EXCLUDES[@]}"
 run_analysis fragmentation fragmentation.json "${WIN[@]}" "${EXCLUDES[@]}"
 run_analysis summary summary.json "${WIN[@]}"
-codelens parse "${WIN[@]}" --format json >"${OUT}/parse.json" 2>/dev/null || true
+codelens parse "${WIN[@]}" >"${OUT}/parse.json" 2>/dev/null || true
 
 tokei --output json >"${OUT}/tokei.json" 2>/dev/null ||
     echo_stderr "[${REPO_NAME}] tokei failed"

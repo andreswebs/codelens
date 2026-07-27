@@ -126,7 +126,7 @@ total_revs`; `fragmentation` for the scalar.
 ## Commit word cloud
 
 - **Consumes:** `codelens parse` -> the `message` column.
-- **Command:** `codelens parse --log git.log --format json | uv run scripts/commit_cloud.py -o cloud.svg`
+- **Command:** `codelens parse --log git.log | uv run scripts/commit_cloud.py -o cloud.svg`
 - **Formats:** SVG or PNG (the -o extension picks the format).
 - **Read:** heuristic only, a conversation starter. Dominant words show where time
   goes: domain terms = good; "bug", "crash", "revert", "bump" = drill deeper.

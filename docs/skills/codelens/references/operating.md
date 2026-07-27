@@ -23,8 +23,8 @@ codelens <analysis> --log git.log > result.json      # stdin is the default inpu
 what powers the `messages` analysis and the word cloud; 3-field logs still parse
 (subject `-`).
 
-The default reads the checked-out branch's history, matching code-maat and
-avoiding commits from unmerged branches or dated after `HEAD`. Pass
+The default reads the checked-out branch's history, avoiding commits from
+unmerged branches or dated after `HEAD`. Pass
 `print-log-command --all` for cross-branch history (all refs), at the cost of
 merge- and branch-tip noise.
 
@@ -91,23 +91,66 @@ not a subcommand.
 Helpers: `print-log-command`, `schema`. The build version is printed by the
 `--version` flag (bare version string), not a subcommand.
 
-## Output formats and shaping
+## Output and shaping
 
-`--format json` (default) wraps rows in a self-describing envelope
-(`schema_version, ok, analysis, row_count, rows`); `--rows N` truncation adds
+codelens emits exactly one thing on stdout: a single self-describing JSON
+envelope, identical whether or not stdout is a terminal. There is no `--format`
+flag and no alternate serialization. The envelope carries `schema_version, ok,
+analysis, shape, semantics`, optionally `transforms` and `params`, then
+`row_count` and the payload (`rows` for a table). `--rows N` truncation adds
 `total_count` and `truncated: true`. An empty-but-valid result is `ok: true,
 row_count: 0, rows: []`, exit 0. Column keys are snake_case.
 
-Analyses that declare flags also carry a `params` object (after `analysis`)
+Analyses that declare flags also carry a `params` object (after `transforms`)
 echoing every declared flag at its effective value, defaults included, so a
 run is self-documenting: `coupling`, `sum-of-coupling`, `code-age`, and
 `messages`. Flagless analyses omit `params`.
 
-- `--format`: `json` | `ndjson` (one row/line, no envelope) | `csv`
-  (code-maat-compatible kebab-case headers) | `table` (human terminal).
-- Bound large output: `--rows N` (all formats, after sorting) and
-  `--fields rows.entity,rows.n_revs` (json only; always keeps `schema_version`
-  and `ok`).
+`shape` is a fixed, per-command member of the closed set `table`, `tree`,
+`graph`, `matrix`, `series`, `text`. Every analysis is `shape: "table"` today;
+the sole exception is `print-log-command`, which is `shape: "text"` and emits a
+bare command line by design, so it stays copy-pasteable. The payload key follows
+from the shape (`rows` for a table).
+
+`semantics` maps each emitted column to a member of a closed 12-entry
+vocabulary. It exists so a renderer or a downstream chart spec can be derived
+without domain knowledge, because codelens authored the data and knows what each
+column means:
+
+| Semantic          | Meaning                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `filepath`        | A repository path, splittable on `/`                        |
+| `person`          | An actor name (an individual or, under `--team-map`, a team) |
+| `date`            | Calendar date, `YYYY-MM-dd`                                 |
+| `commit_id`       | Opaque commit identifier                                    |
+| `text`            | Free prose, never a plottable category                      |
+| `label`           | Categorical name                                            |
+| `flag`            | Boolean                                                     |
+| `count`           | Tally of things (a frequency measure)                       |
+| `loc`             | Line count (a size measure)                                 |
+| `percentage`      | Integer 0-100                                               |
+| `ratio`           | Float 0-1                                                   |
+| `duration_months` | Whole calendar months                                       |
+
+`percentage` is 0-100 while `ratio` is 0-1, and `loc` is distinct from `count`
+so a renderer can pick a size channel over a frequency channel.
+
+`transforms` appears only when a pipeline transform ran (it is omitted for a
+pass-through run) and records which of `include`, `exclude`, `group`,
+`temporal_period`, and `team_map` were active. It also justifies an adjusted
+semantic: under `--group`, `entity` is reported as `label`, not `filepath`,
+because a layer name is not a splittable path; `--team-map` leaves `author` as
+`person`, since a team name and a person name are both opaque actor labels.
+
+`schema --command CMD` returns `shape` and a per-column `semantic`, so both a
+column's meaning and its semantic type are discoverable at runtime. The map
+tracks flags, not data: `coupling` declares four semantics without `--verbose`
+and seven with it.
+
+- Bound large output: `--rows N` (after sorting) and
+  `--fields rows.entity,rows.n_revs`. Under `--fields`, `schema_version`, `ok`,
+  and `shape` are always retained, `transforms` is retained when present, and
+  `semantics` is narrowed to the projected fields.
 - Diagnostics go to stderr; stdout is only results, so piping into a JSON parser
   is safe.
 
@@ -217,10 +260,8 @@ caps every file's reported age at the window length.
 ## Errors and exit codes
 
 Errors are **always** a JSON envelope on stderr (`{ok: false, error: {code,
-message, hint}}`), for every `--format` value including `text` and `table`.
-`--format` selects the results shape on stdout, not the diagnostics on stderr;
-there is no `✗ <message>` text error path, so parse the envelope's `message` and
-`hint` fields directly.
+message, hint}}`). There is no text error path, so parse the envelope's
+`message` and `hint` fields directly.
 
 Exit codes follow the taxonomy in ADR 0002 (BSD `sysexits.h`):
 

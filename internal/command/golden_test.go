@@ -61,10 +61,10 @@ type goldenCase struct {
 // Coverage spans every exit code the taxonomy lets codelens produce except 70
 // (unreachable from well-formed input; see the conformance guard):
 //
-//   - 0  the seven authors success variants, the coupling warning, schema list
-//   - 64 the four usage errors, unknown_format, unknown_schema_command,
+//   - 0  the four authors success variants, the coupling warning, schema list
+//   - 64 the four usage errors, removed_format_flag, unknown_schema_command,
 //     invalid_after_date
-//   - 65 the three --format data errors, invalid_control_char
+//   - 65 empty_log, invalid_control_char
 //   - 74 log_open_failed, input_file_open_failed
 func goldenCases(t *testing.T) []goldenCase {
 	t.Helper()
@@ -76,8 +76,9 @@ func goldenCases(t *testing.T) []goldenCase {
 	authorsLog := string(in)
 
 	// sampleGitLog is a minimal valid git2(+subject) log for scenarios that must
-	// get past the log parser to reach a later failure (unknown_format,
-	// input_file_open_failed): an empty stdin would short-circuit to empty_log.
+	// get past the log parser to reach a later failure (removed_format_flag,
+	// input_file_open_failed): an empty stdin would short-circuit to empty_log
+	// before the flag is rejected.
 	const sampleGitLog = "--a1--2024-01-01--Alice--c1\n10\t0\tsrc/foo.go\n"
 
 	// nulLog embeds a NUL byte in an otherwise valid record to force the
@@ -85,14 +86,10 @@ func goldenCases(t *testing.T) []goldenCase {
 	nulLog := "--a1--2024-01-01--Alice--c1\n10\t0\tsrc/\x00foo.go\n"
 
 	return []goldenCase{
-		// Seven authors success variants: every output format plus --fields,
-		// --rows, and schema --command. Their stdout is byte-identical to the
-		// pre-triple goldens; their .err goldens are empty and their .exit
+		// Four authors success variants: the JSON envelope plus --fields, --rows,
+		// and schema --command. Their .err goldens are empty and their .exit
 		// goldens are 0.
 		{"authors_json", []string{"authors"}, authorsLog},
-		{"authors_ndjson", []string{"--format", "ndjson", "authors"}, authorsLog},
-		{"authors_csv", []string{"--format", "csv", "authors"}, authorsLog},
-		{"authors_table", []string{"--format", "table", "authors"}, authorsLog},
 		{"authors_fields", []string{"--fields", "rows.entity", "authors"}, authorsLog},
 		{"authors_rows2", []string{"--rows", "2", "authors"}, authorsLog},
 		{"authors_schema", []string{"schema", "--command", "authors"}, ""},
@@ -104,17 +101,19 @@ func goldenCases(t *testing.T) []goldenCase {
 		{"usage_invalid_value", []string{"authors", "--rows", "abc"}, ""},
 		{"usage_missing_required_flag", []string{"messages"}, ""},
 
-		// Three --format data errors (exit 65). --format governs stdout results,
-		// never stderr diagnostics, so all three pin an identical JSON error
-		// envelope; that identity is the always-JSON-errors decision.
-		{"format_error_text", []string{"--format", "text", "authors"}, ""},
-		{"format_error_table", []string{"--format", "table", "authors"}, ""},
-		{"format_error_json", []string{"--format", "json", "authors"}, ""},
+		// empty_log (exit 65): an empty stdin is a data error. Keeps the exit-65
+		// and empty_log coverage the deleted format_error_* scenarios were
+		// incidentally providing (all three were the same empty_log envelope).
+		{"empty_log", []string{"authors"}, ""},
+
+		// removed_format_flag (exit 64): pins that --format is gone, classified as
+		// an unknown_flag usage error. Without this, a re-introduction of the flag
+		// would pass the suite (D2). Needs a valid log on stdin or it
+		// short-circuits to empty_log before the flag is rejected.
+		{"removed_format_flag", []string{"--format", "json", "authors"}, sampleGitLog},
 
 		// One scenario per error code renamed in cod-uavr, so each renamed code
-		// carries a golden envelope. unknown_format needs a valid log on stdin or
-		// it short-circuits to empty_log before the format is validated.
-		{"unknown_format", []string{"--format", "bogus", "authors"}, sampleGitLog},
+		// carries a golden envelope.
 		{"unknown_schema_command", []string{"schema", "--command", "bogus"}, ""},
 		{"invalid_after_date", []string{"print-log-command", "--after", "notadate"}, ""},
 		{"log_open_failed", []string{"--log", tmpToken + "/missing.log", "authors"}, ""},
@@ -129,6 +128,17 @@ func goldenCases(t *testing.T) []goldenCase {
 		// schema with no --command: the command list, including the errors
 		// inventory, so the inventory has golden coverage.
 		{"schema_list", []string{"schema"}, ""},
+
+		// authors_grouped (exit 0): pins the D4 semantic degradation (grouped entity
+		// becomes a label, not a filepath) and the transforms record together. The
+		// group fixture must exist, so it is a committed testdata file referenced by
+		// relative path (the tmpToken harness only names files it does not create).
+		{"authors_grouped", []string{"--group", "testdata/layers.group", "authors"}, authorsLog},
+
+		// coupling_verbose (exit 0): pins the D15 flag-gated semantics. --verbose adds
+		// the three revision-detail columns, so the semantics map carries 7 entries,
+		// not the 4 of a plain coupling run.
+		{"coupling_verbose", []string{"coupling", "--verbose"}, weakCouplingLog(8, 2)},
 	}
 }
 

@@ -130,8 +130,8 @@ func TestSocDescriptor(t *testing.T) {
 		t.Errorf("Flags = %+v, want a single min-revs=5 flag", d.Flags)
 	}
 	wantCols := []Column{
-		{Name: "entity", Type: "string", Desc: "module path"},
-		{Name: "soc", Type: "int", Desc: "number of shared transactions"},
+		{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+		{Name: "soc", Type: "int", Semantic: SemanticCount, Desc: "number of shared transactions"},
 	}
 	if !reflect.DeepEqual(d.RowSchema, wantCols) {
 		t.Errorf("RowSchema = %+v, want %+v", d.RowSchema, wantCols)

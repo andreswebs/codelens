@@ -24,8 +24,18 @@ type Column struct {
 	Name string `json:"name"`
 	// Type is the JSON type of the field ("string", "int", ...).
 	Type string `json:"type"`
+	// Semantic names what the field means as opposed to how it is encoded (see
+	// Semantics). It is what makes a downstream chart spec derivable without domain
+	// knowledge, so it is required on every column.
+	Semantic string `json:"semantic"`
 	// Desc is a one-line description of the field's meaning.
 	Desc string `json:"desc"`
+	// FlagGated names the flag a column's presence depends on. An empty value means
+	// the column is always declared. It is what lets SemanticsOf omit a column that
+	// cannot appear, without the output layer knowing which analysis it is
+	// describing. It is kept off the schema (json:"-"): the schema declares the full
+	// untransformed vocabulary, gated columns included.
+	FlagGated string `json:"-"`
 }
 
 // Flag describes one command flag for schema introspection and command-tree
@@ -102,6 +112,10 @@ type Descriptor struct {
 	Aliases []string
 	// Summary is a one-line description of the analysis.
 	Summary string
+	// Shape names the topology of this analysis's payload (see Shapes). It is
+	// fixed per analysis: the payload key follows from it, and alternate views are
+	// downstream derivations rather than output modes.
+	Shape string
 	// Flags declares the per-command flags the analysis honours.
 	Flags []Flag
 	// RowSchema declares the columns each output row carries.

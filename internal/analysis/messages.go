@@ -54,12 +54,13 @@ func messagesDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "messages",
 		Summary: "Entity frequency for commit-message regex matches",
+		Shape:   ShapeTable,
 		Flags: []Flag{
 			{Name: "expression", Type: "string", Default: "", Required: true, Desc: "regular expression matched against commit messages"},
 		},
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "matches", Type: "int", Desc: "revisions whose commit message matched the expression"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "matches", Type: "int", Semantic: SemanticCount, Desc: "revisions whose commit message matched the expression"},
 		},
 		ErrorCodes: []string{"empty_log", "missing_messages", "invalid_expression"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

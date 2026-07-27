@@ -98,27 +98,22 @@ authoritative list.
 That is 18 analysis subcommands. `coupling`'s `--verbose` variant and the
 `parse` dump round out code-maat's 20 analysis functions.
 
-## Output formats
+## Output
 
-Select with `--format`:
+`codelens` emits exactly one thing on stdout: a single self-describing JSON
+envelope. There is no format selection; JSON is the one representation,
+identical whether or not stdout is a terminal. Nothing changes shape based on a
+TTY.
 
-| Format   | Use                                                                    |
-| -------- | ---------------------------------------------------------------------- |
-| `json`   | Default. Self-describing envelope with metadata.                       |
-| `ndjson` | One row object per line, no envelope. Stream row-heavy results.        |
-| `csv`    | code-maat-compatible headers (`kebab-case`) and column order. Interop. |
-| `table`  | Aligned columns for a human terminal. Opt in only.                     |
-
-JSON is the default regardless of whether stdout is a terminal. The output is
-predictable; nothing changes shape based on a TTY.
-
-### JSON envelope (default)
+### JSON envelope
 
 ```json
 {
   "schema_version": 1,
   "ok": true,
   "analysis": "authors",
+  "shape": "table",
+  "semantics": { "entity": "filepath", "n_authors": "count", "n_revs": "count" },
   "row_count": 4,
   "rows": [
     { "entity": "src/code_maat/parsers/git2.clj", "n_authors": 2, "n_revs": 2 }
@@ -126,6 +121,13 @@ predictable; nothing changes shape based on a TTY.
 }
 ```
 
+- `shape` is the payload topology and names the payload key: a `table` result
+  carries `rows`. Every analysis is `table` today; the other shapes (`tree`,
+  `graph`, `matrix`, `series`) arrive with the analyses that need them.
+- `semantics` maps each column to a semantic type (`filepath`, `count`,
+  `percentage`, `duration_months`, and so on). This is what lets a downstream
+  renderer derive a chart without domain knowledge: `codelens` authored the
+  data, so it knows what each column means.
 - `row_count` is the number of rows emitted.
 - When `--rows N` truncates the result, the envelope also carries
   `total_count` (rows before the cap) and `truncated: true`, so a capped result
@@ -134,42 +136,28 @@ predictable; nothing changes shape based on a TTY.
 - Column keys are `snake_case`. The `parse` command dumps records in log order;
   every other analysis sorts deterministically.
 
-### ndjson
+### Transforms and what a column means
 
-```sh
-codelens authors --log "${CODELENS_LOG}" --format ndjson
-```
+When a pipeline transform runs, the envelope carries a `transforms` object
+recording which ones ran (`include`, `exclude`, `group`, `temporal_period`,
+`team_map`); it is absent on a pass-through run. A transform can change what a
+column means, and `semantics` follows: `--group` collapses file paths into
+architectural layers, so `entity` becomes a `label` rather than a `filepath`
+(its `/`-splittable structure is gone). A transform that only aggregates does
+not degrade the semantic: under `--team-map`, `author` stays `person`, because a
+team name and a person name are both opaque categorical actor labels.
 
-```text
-{"entity":"src/code_maat/parsers/git2.clj","n_authors":2,"n_revs":2}
-{"entity":"src/code_maat/parsers/git.clj","n_authors":1,"n_revs":2}
-```
-
-`ndjson` drops the envelope metadata (`analysis`, `row_count`, `total_count`);
-use `json` when you need it.
-
-### csv
-
-```sh
-codelens authors --log "${CODELENS_LOG}" --format csv
-```
-
-```text
-entity,n-authors,n-revs
-src/code_maat/parsers/git2.clj,2,2
-src/code_maat/parsers/git.clj,1,2
-```
-
-### table
-
-```sh
-codelens authors --log "${CODELENS_LOG}" --format table
-```
-
-```text
-entity                          n_authors  n_revs
-src/code_maat/parsers/git2.clj  2          2
-src/code_maat/parsers/git.clj   1          2
+```json
+{
+  "schema_version": 1,
+  "ok": true,
+  "analysis": "authors",
+  "shape": "table",
+  "semantics": { "entity": "label", "n_authors": "count", "n_revs": "count" },
+  "transforms": { "group": true },
+  "row_count": 2,
+  "rows": [{ "entity": "Parsers", "n_authors": 2, "n_revs": 4 }]
+}
 ```
 
 ### Bounding output (`--fields`, `--rows`)
@@ -184,16 +172,19 @@ codelens authors --log "${CODELENS_LOG}" \
 ```json
 {
   "ok": true,
-  "schema_version": 1,
   "rows": [
     { "entity": "src/code_maat/parsers/git2.clj", "n_authors": 2 },
     { "entity": "src/code_maat/parsers/git.clj", "n_authors": 1 }
-  ]
+  ],
+  "schema_version": 1,
+  "semantics": { "entity": "filepath", "n_authors": "count" },
+  "shape": "table"
 }
 ```
 
-`--fields` applies to JSON output only and always retains `schema_version` and
-`ok`. `--rows` applies to every format and truncates after sorting.
+`--fields` always retains `schema_version`, `ok`, and `shape`; it retains
+`transforms` when present, and narrows `semantics` to the projected columns.
+`--rows` caps the payload after sorting (0 = all).
 
 ## Schema introspection
 
@@ -204,11 +195,13 @@ codelens schema                    # list every command, its aliases and exit co
 codelens schema --command coupling # full contract for one command
 ```
 
-`schema --command CMD` returns the command summary, its `flags`
+`schema --command CMD` returns the command summary, its `shape`, its `flags`
 (`name`, `type`, `default`, `required`, `desc`), its `row_schema`
-(`name`, `type`, `desc` per output column), its `error_codes`, and its
-`exit_codes`. This is the source of truth for what each analysis accepts and
-emits, including columns that appear only with `--verbose`.
+(`name`, `type`, `semantic`, `desc` per output column), its `error_codes`, and
+its `exit_codes`. This is the source of truth for what each analysis accepts and
+emits, including columns that appear only with `--verbose`. The schema declares
+the command's untransformed default: it always reports `entity` as `filepath`,
+while an envelope emitted under `--group` reports it as `label`.
 
 ## Common flags
 
@@ -218,7 +211,6 @@ by `schema --command CMD`. The ones you will reach for most:
 | Flag                  | Meaning                                                          |
 | --------------------- | ---------------------------------------------------------------- |
 | `--log FILE`          | Read the log from FILE instead of stdin (`-` forces stdin).      |
-| `--format FMT`        | `json` (default), `ndjson`, `csv`, or `table`.                   |
 | `--fields PATHS`      | Project JSON fields, e.g. `rows.entity,rows.degree`.             |
 | `--rows N`            | Cap output to N rows after sorting (0 = all).                    |
 | `--group FILE`        | Map files to architectural layers (`--group-format text\|json`). |
@@ -243,9 +235,6 @@ into a JSON parser is always safe. Errors are a JSON envelope:
   }
 }
 ```
-
-With `--format text`, errors render as `✗ <message>` and a `hint:` line on
-stderr instead.
 
 Exit codes follow the exit-code taxonomy in
 [ADR 0002](docs/adr/0002-exit-code-taxonomy.md):
@@ -304,6 +293,9 @@ render, read the crime scene).
   - the canonical CLI operating guide (the fuller reference behind this README).
 - [AGENTS.md](AGENTS.md) - repository map and the build, validate, and
   contribution guide.
+- [docs/adr/0008-canonical-output-representation.md](docs/adr/0008-canonical-output-representation.md)
+  - the decision behind the single self-describing envelope (`shape`,
+  `semantics`, `transforms`) and the removal of the format matrix.
 
 ## Authors
 

@@ -23,9 +23,9 @@ rows: [...]}`; rows carry snake_case columns (`entity`, `n_revs`, `main_dev`,
 
 The two sources are not symmetric. Tokei is the **skeleton** (which files exist,
 how big); codelens is a **color overlay** joined onto it, defaulting to 0 for
-files with no recorded change. This mirrors Tornhill's `csv_as_enclosure_json.py`
-(`--structure` vs `--weights`) and is why stable and third-party files still
-appear, as cool circles, giving the whole-codebase view the book describes.
+files with no recorded change. Structure and weights are separate inputs
+(`--structure` vs `--weights`), so stable and third-party files with no recorded
+change still appear, as cool circles, giving the whole-codebase view.
 
 ## Two modes
 

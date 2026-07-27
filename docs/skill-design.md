@@ -185,7 +185,7 @@ confirms codelens does not track renames (the enclosure rename edge case holds),
 and a `--after <date>` argument is forwarded to git, so date scoping works through
 the helper. Analysis-specific flags live on their commands (coupling thresholds,
 `code-age --time-now`, `messages --expression`); the pipeline flags (`--log`,
-`--format`, `--group`, `--team-map`, `--temporal-period`, `--rows`, `--fields`)
+`--group`, `--team-map`, `--temporal-period`, `--rows`, `--fields`)
 are global.
 
 Re-run `codelens schema --command <analysis>` after any codelens change to catch

@@ -15,6 +15,7 @@ func descriptorFixture() Descriptor {
 		Name:    "coupling",
 		Aliases: []string{"logical"},
 		Summary: "Logical (temporal) coupling between entity pairs",
+		Shape:   ShapeTable,
 		Flags: []Flag{
 			{Name: "min-coupling", Type: "int", Default: 30, Required: false, Desc: "minimum coupling degree in percent"},
 		},
@@ -41,6 +42,9 @@ func TestSchema_BuildsFromDescriptor(t *testing.T) {
 	}
 	if got.Summary != "Logical (temporal) coupling between entity pairs" {
 		t.Errorf("Summary = %q", got.Summary)
+	}
+	if got.Shape != ShapeTable {
+		t.Errorf("Shape = %q, want %q", got.Shape, ShapeTable)
 	}
 	if len(got.Aliases) != 1 || got.Aliases[0] != "logical" {
 		t.Errorf("Aliases = %v, want [logical]", got.Aliases)
@@ -71,7 +75,7 @@ func TestSchema_JSONKeys(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	for _, key := range []string{
-		"schema_version", "ok", "command", "summary", "aliases",
+		"schema_version", "ok", "command", "summary", "aliases", "shape",
 		"flags", "row_schema", "error_codes", "exit_codes",
 	} {
 		if _, ok := m[key]; !ok {
@@ -139,7 +143,7 @@ func TestMetaSchema_BuildsAndNormalizes(t *testing.T) {
 	flags := []Flag{
 		{Name: "command", Type: "string", Desc: "describe a single CMD"},
 	}
-	got := MetaSchema("schema", "describe commands", flags, []string{"unknown_schema_command"}, []int{0, 64})
+	got := MetaSchema("schema", "describe commands", "", flags, []string{"unknown_schema_command"}, []int{0, 64})
 
 	if got.SchemaVersion != output.SchemaVersion || !got.OK {
 		t.Errorf("envelope = %+v, want ok/version set", got)
@@ -185,7 +189,7 @@ func TestMetaSchema_BuildsAndNormalizes(t *testing.T) {
 // TestMetaSchema_NilFlagsAndCodes ensures a meta command with no flags and no
 // error codes (e.g. version) normalizes those slices to non-nil too.
 func TestMetaSchema_NilFlagsAndCodes(t *testing.T) {
-	got := MetaSchema("version", "print the build version", nil, nil, []int{0})
+	got := MetaSchema("version", "print the build version", "", nil, nil, []int{0})
 	if got.Flags == nil {
 		t.Error("Flags is nil, want empty non-nil slice")
 	}

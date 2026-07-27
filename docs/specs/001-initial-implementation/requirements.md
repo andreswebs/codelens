@@ -1,5 +1,13 @@
 # codelens (Initial Implementation) - Requirements
 
+> Note: This is a delivered historical record of what spec 001 shipped. The
+> output-format requirements below (the EARS requirements for `--format ndjson`,
+> `--format csv`, and `--format table`) were later superseded by
+> [ADR 0008](../../adr/0008-canonical-output-representation.md), which removed the
+> format matrix in favour of a single self-describing JSON envelope. The
+> requirement bodies and their IDs are preserved unchanged, because closed
+> tickets and `docs/specs/learnings.md` reference them.
+
 ## Introduction
 
 codelens is a command-line tool that mines the history of a git repository and

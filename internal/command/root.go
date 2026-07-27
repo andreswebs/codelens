@@ -24,7 +24,6 @@ func init() {
 // captured by CommandNotFound and turned into the ErrUnknownCommand sentinel;
 // any other error is returned unchanged for Run's exit boundary to resolve.
 func runRoot(ctx context.Context, args []string, deps Deps) error {
-	var format string
 	var unknownCmd string
 
 	root := &cli.Command{
@@ -34,7 +33,7 @@ func runRoot(ctx context.Context, args []string, deps Deps) error {
 		Reader:    deps.In,
 		Writer:    deps.Out,
 		ErrWriter: deps.Err,
-		Flags:     globalFlags(&format),
+		Flags:     globalFlags(),
 		Commands:  append(analysisCommands(deps.In), metaCLICommands()...),
 		// urfave routes an unrecognized command to its help topic; capturing it
 		// here suppresses that and lets the top level classify it as a usage

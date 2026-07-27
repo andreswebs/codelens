@@ -1,5 +1,11 @@
 # 001 - Initial Implementation Plan
 
+> Note: This is a delivered historical record of what spec 001 shipped. Its
+> references to a `--format` matrix (`json`/`ndjson`/`csv`/`table`) were later
+> superseded by [ADR 0008](../../adr/0008-canonical-output-representation.md),
+> which removed the format matrix in favour of a single self-describing JSON
+> envelope. The plan text and its task IDs are preserved unchanged.
+
 Implementation plan for the first complete version of `codelens`: a git2-log
 analyzer that ports code-maat's 20 analyses with an agent-first I/O surface.
 

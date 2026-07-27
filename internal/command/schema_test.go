@@ -33,15 +33,17 @@ type schemaCmd struct {
 	Command       string   `json:"command"`
 	Summary       string   `json:"summary"`
 	Aliases       []string `json:"aliases"`
+	Shape         string   `json:"shape"`
 	Flags         []struct {
 		Name string `json:"name"`
 		Type string `json:"type"`
 		Desc string `json:"desc"`
 	} `json:"flags"`
 	RowSchema []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-		Desc string `json:"desc"`
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Semantic string `json:"semantic"`
+		Desc     string `json:"desc"`
 	} `json:"row_schema"`
 	ErrorCodes       []string `json:"error_codes"`
 	CommonErrorCodes []string `json:"common_error_codes"`
@@ -207,11 +209,53 @@ func TestSchema_Conformance(t *testing.T) {
 			if c.Name == "" || c.Type == "" || c.Desc == "" {
 				t.Errorf("%q: column %+v is not fully documented", d.Name, c)
 			}
+			if c.Semantic == "" || !analysis.ValidSemantic(c.Semantic) {
+				t.Errorf("%q: column %q has semantic %q, not a member of %v", d.Name, c.Name, c.Semantic, analysis.Semantics())
+			}
 		}
 		if len(got.ExitCodes) == 0 {
 			t.Errorf("%q: exit_codes is empty", d.Name)
 		}
+		if !analysis.ValidShape(got.Shape) {
+			t.Errorf("%q: shape %q is not a member of the closed set %v", d.Name, got.Shape, analysis.Shapes())
+		}
 	}
+}
+
+// TestSchema_MetaShapes pins the D5 shape declarations for the meta commands:
+// print-log-command reports shape "text" so an agent learns its stdout is a bare
+// command line, and schema omits the key entirely because its stdout is an
+// introspection envelope, not an analysis result.
+func TestSchema_MetaShapes(t *testing.T) {
+	t.Run("print-log-command", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := Run([]string{"schema", "--command", "print-log-command"}, Deps{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
+		if code != 0 {
+			t.Fatalf("exit = %d, want 0; stderr:\n%s", code, stderr.String())
+		}
+		var got schemaCmd
+		if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+			t.Fatalf("not a schema envelope: %v", err)
+		}
+		if got.Shape != analysis.ShapeText {
+			t.Errorf("shape = %q, want %q", got.Shape, analysis.ShapeText)
+		}
+	})
+
+	t.Run("schema omits shape", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := Run([]string{"schema", "--command", "schema"}, Deps{In: strings.NewReader(""), Out: &stdout, Err: &stderr})
+		if code != 0 {
+			t.Fatalf("exit = %d, want 0; stderr:\n%s", code, stderr.String())
+		}
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(stdout.Bytes(), &m); err != nil {
+			t.Fatalf("not a JSON object: %v", err)
+		}
+		if _, ok := m["shape"]; ok {
+			t.Errorf("schema --command schema should omit the shape key; got %s", stdout.String())
+		}
+	})
 }
 
 func contains(s []string, want string) bool {

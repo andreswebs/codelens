@@ -34,12 +34,16 @@ func mainDevByRevsDescriptor() Descriptor {
 		Name:    "main-developer-by-revisions",
 		Aliases: []string{"main-dev-by-revs"},
 		Summary: "Main developer per entity by revision count",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "main_dev", Type: "string", Desc: "author with the most revisions of the entity"},
-			{Name: "added", Type: "int", Desc: "revisions by the main developer"},
-			{Name: "total_added", Type: "int", Desc: "total revisions of the entity across all authors"},
-			{Name: "ownership", Type: "float", Desc: "main developer's revisions over the total (2 significant digits)"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "main_dev", Type: "string", Semantic: SemanticPerson, Desc: "author with the most revisions of the entity"},
+			// added/total_added are REVISION counts here, not line counts, so their
+			// semantic is count, not loc (D3c). main-developer uses the identical column
+			// names for line counts; do not copy this pair across without checking.
+			{Name: "added", Type: "int", Semantic: SemanticCount, Desc: "revisions by the main developer"},
+			{Name: "total_added", Type: "int", Semantic: SemanticCount, Desc: "total revisions of the entity across all authors"},
+			{Name: "ownership", Type: "float", Semantic: SemanticRatio, Desc: "main developer's revisions over the total (2 significant digits)"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

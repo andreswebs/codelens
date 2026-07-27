@@ -25,9 +25,13 @@ func summaryDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "summary",
 		Summary: "Overview counts for the mined data",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "statistic", Type: "string", Desc: "metric name"},
-			{Name: "value", Type: "int", Desc: "metric value"},
+			// statistic is the categorical key of a key-value table (label), and value is
+			// its tally (count): summary is the one analysis whose payload is a
+			// metric-name/metric-value pair rather than an entity row.
+			{Name: "statistic", Type: "string", Semantic: SemanticLabel, Desc: "metric name"},
+			{Name: "value", Type: "int", Semantic: SemanticCount, Desc: "metric value"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

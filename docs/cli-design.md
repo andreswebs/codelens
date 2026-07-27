@@ -172,7 +172,8 @@ reference doc §6); the schema output is the source of truth per command.
 
 codelens emits exactly one thing on stdout: a single JSON envelope, identical
 regardless of TTY. There is no `--format` flag and no alternate serialization;
-JSON is the one representation (see ADR 0003). Shape:
+JSON is the one representation (see
+[ADR 0008](adr/0008-canonical-output-representation.md)). Shape:
 
 ```json
 {
@@ -224,16 +225,81 @@ Every envelope is self-describing along two axes:
   payload key follows from it (`rows` for `table`; `nodes` and `edges` for
   `graph`; and so on). Today every analysis is `shape: "table"` with a `rows`
   payload; the other shapes are introduced with the analyses that need them
-  (hierarchy, graph, matrix, and time-series outputs).
+  (hierarchy, graph, matrix, and time-series outputs). `print-log-command`
+  declares a sixth shape, `text` (see §6.5).
 - `semantics` maps each field to a semantic type (`filepath`, `percentage`,
-  `count`, `duration`, `person`, ...). This is what codelens knows because it
-  authored the data, and it is what lets a downstream renderer derive a chart
-  without domain knowledge. The tabular payload is deliberately kept close to a
-  chart-spec input (a values array plus its semantics), so a downstream adapter
-  is near-identity.
+  `count`, `duration_months`, `person`, ...). This is what codelens knows
+  because it authored the data, and it is what lets a downstream renderer derive
+  a chart without domain knowledge. The tabular payload is deliberately kept
+  close to a chart-spec input (a values array plus its semantics), so a
+  downstream adapter is near-identity.
 
 The `parse` analysis emits the modification records in **log order** (as
 parsed), a passthrough dump rather than a sorted analysis.
+
+#### Semantic vocabulary
+
+The semantic is a bare closed-enum string; its range and unit are implied by the
+name and documented here once. The closed vocabulary is twelve entries. The
+split between numeric measures is deliberate: `percentage` is an integer 0-100
+while `ratio` is a float 0-1, and `loc` is distinguished from `count` so a
+renderer can pick a size channel over a frequency channel without domain
+knowledge.
+
+| Semantic          | Meaning                                                   | Example columns                              |
+| ----------------- | --------------------------------------------------------- | -------------------------------------------- |
+| `filepath`        | A repository path, splittable on `/`                      | `entity`, `coupled`                          |
+| `person`          | An actor name (individual or, under `--team-map`, a team) | `author`, `peer`, `main_dev`                 |
+| `date`            | Calendar date, `YYYY-MM-dd`                               | `date`                                       |
+| `commit_id`       | Opaque commit identifier                                  | `rev`                                        |
+| `text`            | Free prose, never a plottable category                    | `message`                                    |
+| `label`           | Categorical name                                          | `statistic`, grouped `entity`                |
+| `flag`            | Boolean                                                   | `binary`                                     |
+| `count`           | Tally of things                                           | `n_revs`, `n_authors`, `commits`, `soc`      |
+| `loc`             | Line count (a size measure)                               | `added`, `deleted`, `removed`, `loc_added`   |
+| `percentage`      | Integer 0-100                                             | `degree`, `strength`                         |
+| `ratio`           | Float 0-1                                                 | `ownership`, `fractal_value`                 |
+| `duration_months` | Whole calendar months                                     | `age_months`                                 |
+
+A semantic is assigned per (analysis, column), never per column name globally:
+`added` is `loc` in `main-developer` but `count` in
+`main-developer-by-revisions`, where it tallies revisions rather than lines.
+
+#### Transforms and the structural-affordance rule
+
+When a pipeline transform runs, the envelope carries a `transforms` object
+recording which ones were active (`include`, `exclude`, `group`,
+`temporal_period`, `team_map`). It is its own key, separate from `params` (which
+keeps its per-analysis tuning meaning), and it is omitted entirely when the
+pipeline was a pass-through.
+
+A transform can change what a column means, and `semantics` reports the meaning
+for **this run**. The governing rule: degrade a semantic only when a
+_structural affordance_ is lost. `--group` collapses file paths into
+architectural layers, so `entity` becomes a `label` rather than a `filepath`
+(the `/`-splittable structure is gone) and the envelope records
+`"transforms": { "group": true }`. `--team-map` does not degrade: `author` stays
+`person`, because a team name and a person name are both opaque categorical
+actor labels, and no structural affordance is lost by aggregating one into the
+other.
+
+#### Flags track semantics, not data
+
+The `semantics` map lists every declared column minus those excluded by an
+invocation flag: semantics track flags, never data. `coupling` without
+`--verbose` omits its three verbose columns; `parse` always lists `loc_added`,
+`loc_deleted`, and `binary` because their absence is per-row, not per-command.
+The map is therefore deterministic for a given command line.
+
+#### Schema declares the default; the envelope declares the run
+
+`schema --command CMD` declares the command's **untransformed default**: it
+always reports `entity` as `filepath` and always lists every column. The
+envelope declares **this invocation**: under `--group` its `semantics` reports
+`entity` as `label`, and under `--verbose`-gating flags its column set narrows.
+This asymmetry is intentional. The schema is a static contract for a command;
+the envelope is a description of one result. A later reader should not mistake
+the difference for a bug.
 
 ### 6.3 Viz-spec encodings are downstream
 
@@ -245,10 +311,31 @@ transforms are mechanical. codelens is the data plane; rendering is downstream.
 ### 6.4 Field projection (`--fields`)
 
 Comma-separated JSON paths, validated against the envelope; invalid paths error
-with the valid set listed. `schema_version` and `ok` are always retained.
-Example: `--fields rows.entity,rows.degree`.
+with the valid set listed. Example: `--fields rows.entity,rows.degree`.
+
+Retention under projection follows fixed rules so a projected envelope stays
+self-describing:
+
+- `schema_version`, `ok`, and `shape` are always retained.
+- `semantics` is retained, narrowed to the surviving payload fields (an empty
+  object when none survive), so every projected column still carries its
+  meaning.
+- `transforms` is always retained when present, because it justifies an adjusted
+  semantic (an `entity` reported as `label` is only explained by the `group`
+  transform).
 
 `--rows N` caps rows after sorting, before the envelope is built.
+
+### 6.5 The two bare-text exceptions
+
+Stdout carries only the canonical envelope, with two deliberate exceptions, both
+so their output stays copy-pasteable:
+
+- `print-log-command` emits a bare git command line, not JSON. It declares
+  `shape: "text"` so an agent learns from `schema --command print-log-command`
+  that its stdout is not an envelope.
+- `--version` prints a bare version string. It is a flag, not a subcommand, so
+  it is off the `schema` path entirely.
 
 ## 7. Errors and exit codes
 
@@ -302,7 +389,7 @@ codelens follows the taxonomy in
 | Code | Code string(s)                                                                                                                                                                                                                                                       | Meaning                             | Examples                                                                                                                |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | 0    | -                                                                                                                                                                                                                                                                    | success (incl. empty result)        | any analysis that ran                                                                                                   |
-| 64   | `unknown_command`, `unknown_flag`, `unknown_format`, `unknown_schema_command`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now`, `invalid_after_date` | usage error (EX_USAGE)              | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group            |
+| 64   | `unknown_command`, `unknown_flag`, `unknown_schema_command`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now`, `invalid_after_date` | usage error (EX_USAGE)              | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group            |
 | 65   | `parse_error`, `invalid_control_char`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map`                                                                                                                               | data error (EX_DATAERR)             | unparseable or empty log, disallowed control character, malformed `--team-map`, churn analysis on a log with no numstat |
 | 70   | `internal_error`                                                                                                                                                                                                                                                     | internal / unexpected (EX_SOFTWARE) | a bug; an unexpected internal fault, reported as a one-line coded error like any other                                  |
 | 74   | `log_open_failed`, `input_file_open_failed`                                                                                                                                                                                                                          | I/O error (EX_IOERR)                | unreadable `--log`, `--group`, or `--team-map` file                                                                     |
@@ -376,8 +463,7 @@ classified from its messages; all resolve to exit 64.
     "log_open_failed",
     "missing_required_flag",
     "parse_error",
-    "unknown_flag",
-    "unknown_format"
+    "unknown_flag"
   ],
   "exit_codes": [0, 64, 65, 70, 74]
 }
@@ -499,7 +585,7 @@ capped for a read-only local log analyzer with no API payload or mutations.
    stock 3-field logs still parse. See [§5](#5-input) and reference doc §3.2.
 3. **One JSON representation.** Output is a single self-describing, shape-aware
    JSON envelope; there is no `--format` flag and no CSV, ndjson, or human table
-   output. See [ADR 0003](adr/0003-canonical-output-representation.md). Numeric
+   output. See [ADR 0008](adr/0008-canonical-output-representation.md). Numeric
    results are still pinned against the original's expected outputs; only the
    serialization differs.
 

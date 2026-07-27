@@ -10,11 +10,10 @@ import (
 // wantSentinelCount is the number of registering terr.New sentinels linked into
 // the whole binary. Re-derive it from the tree rather than trusting the number:
 // grep -rn 'terr\.New(' --include='*.go' . | grep -v _test.go. Current
-// derivation (22):
+// derivation (21):
 //
 //	internal/gitlog/errors.go              3 (parse_error, empty_log, invalid_control_char)
 //	internal/output/fields.go              1 (invalid_field)
-//	internal/output/format.go              1 (unknown_format)
 //	internal/analysis/messages.go          2 (invalid_expression, missing_messages)
 //	internal/analysis/codeage.go           1 (invalid_time_now)
 //	internal/analysis/churn/churn.go       1 (missing_metrics)
@@ -27,10 +26,10 @@ import (
 //	                                          invalid_after_date)
 //	internal/command/usage.go              3 (unknown_flag, invalid_value, missing_required_flag)
 //
-// The per-file tallies sum to 22. cod-q42s raised this from 18 by promoting the
+// The per-file tallies sum to 21. cod-q42s raised this from 18 by promoting the
 // formerly-inline unknown_command to a registered sentinel and adding the three
-// classifier sentinels.
-const wantSentinelCount = 22
+// classifier sentinels; removing the --format flag then dropped unknown_format.
+const wantSentinelCount = 21
 
 // snakeCase is the ADR 0003 code shape: lowercase words joined by underscores.
 var snakeCase = regexp.MustCompile(`^[a-z0-9]+(_[a-z0-9]+)*$`)

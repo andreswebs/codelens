@@ -1,6 +1,6 @@
 ---
 id: cod-z4wu
-status: open
+status: closed
 deps: []
 links: [cod-304f]
 created: 2026-07-27T12:56:46Z
@@ -53,3 +53,15 @@ the enum, any viz-spec export inside the binary, and the complexity epic.
 - `schema_version` is still `1`, with the breaking change recorded in CHANGELOG.md.
 - markdownlint clean on every touched markdown file.
 
+
+## Notes
+
+**2026-07-27T14:29:37Z**
+
+Epic closed after verifying all acceptance criteria against the built binary (all 5 children were already closed):
+- `codelens --format json authors` -> exit 64 unknown_flag; no `--format`/ndjson/csv/table output references remain in code (remaining "csv" is only --team-map-format). Pinned by golden test removed_format_flag.
+- Every analysis envelope carries `shape` (table) and `semantics`; `transforms` appears only when a pipeline transform ran (verified group -> {"group":true} and entity semantic degrades filepath->label; absent otherwise).
+- `schema --command CMD` declares `shape` and per-column `semantic` for analyses and meta commands (print-log-command declares shape:text).
+- schema_version stays 1 (all three envelope fields additive); breaking --format removal recorded in CHANGELOG.md.
+- markdownlint clean (project .markdownlint.yaml) on CHANGELOG.md, docs/cli-design.md, ADR 0008. make build green.
+Follow-on work (non-table shapes, viz-spec adapters) is tracked in cod-304f, deliberately deferred and not yet decomposed.

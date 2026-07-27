@@ -1,6 +1,6 @@
 ---
 id: cod-fb72
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-27T12:59:52Z
@@ -251,3 +251,17 @@ internal/command/testdata/README.md            drop format framing
   without a scenario in the `goldenCases` table).
 - `make build` green.
 
+
+## Notes
+
+**2026-07-27T13:52:45Z**
+
+Removed --format and the alternate serializers (json only), per ADR 0008 / plan ticket 1, purely subtractive.
+
+Deleted internal/output/format.go + format_test.go (Emit, emitNDJSON/CSV/Table, rowMaps/Objects, cellString, snakeToKebab, errUnknownFormat). Production caller commands.go now emits via the pre-existing output.EmitProjected. Dropped the --format flag, columnNames helper, and root.go's format var/binding; globalFlags() is now nullary and its doc comment rewritten (no more EmitError-destination rationale). Removed unknown_format from analysis/schema.go commonErrorCodes and its derivation comment; sentinel count 22 -> 21 in registry_guard_test.go.
+
+Replaced error_format_test.go with error_envelope_test.go (TestError_IsAlwaysJSONEnvelope): forces empty_log, asserts JSON error envelope on stderr, empty stdout, no text path.
+
+Goldens: deleted 6 format scenarios + unknown_format (21 files); added empty_log (exit 65) and removed_format_flag (exit 64, unknown_flag for -format) (6 files). authors_json/fields/rows2 and coupling_warning are byte-identical; authors_schema.out and schema_list.out changed ONLY by dropping unknown_format from common_error_codes and the errors inventory, as expected.
+
+Verified: grep for --format in internal/,cmd/ shows only the removal-pinning golden + comments; ndjson hits are the unrelated stderr-warning stream in output/warning.go. make build green; TestRegistry_Coherent, TestExitCodes_DeclaredCodesAreExercised, TestError_IsAlwaysJSONEnvelope, TestGolden all pass. Next: cod-4typ (shape + payload marshaler) revives columnNames for Meta.Columns.

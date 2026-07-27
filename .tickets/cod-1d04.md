@@ -1,6 +1,6 @@
 ---
 id: cod-1d04
-status: open
+status: closed
 deps: [cod-435u]
 links: []
 created: 2026-07-27T13:14:27Z
@@ -230,3 +230,9 @@ docs/skills/codelens/scripts/commit_cloud.py        :18 docstring usage
 - markdownlint clean on every touched markdown file.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-27T14:20:38Z**
+
+Skill updated for the canonical shape-aware envelope (ADR 0008). Dropped --format json from all four invocation sites (SKILL.md, references/catalog.md, scripts/run.bash x2, scripts/commit_cloud.py docstring); git's own --format= left intact. Rewrote references/operating.md 'Output and shaping': one JSON envelope, no default-format framing, documented shape (closed set, table everywhere except print-log-command=text), the 12-member semantic vocabulary as a table with the percentage-vs-ratio and loc-vs-count distinctions, transforms (group degrades entity to label; team-map keeps author as person), D6 --fields retention rules (keeps schema_version/ok/shape, retains transforms when present, narrows semantics), D15 coupling 4-vs-7 semantics, and that schema --command returns shape plus per-column semantic. Errors section: dropped both --format clauses. D16 lineage: removed 'matching code-maat' at operating.md:26 and rewrote the enclosure.md Tornhill csv_as_enclosure_json.py attribution to state the structure/weights behaviour directly. Left the enclosure-family visualization term (domain term, not tool-family) and the two book/D3-template Tornhill references (conceptual foundation + actionable drop-in-template info) as they carry real information. Verified: all six Python test suites pass, bash -n run.bash OK, markdownlint clean, make build green, and the SKILL example command runs exit 0 against the binary.

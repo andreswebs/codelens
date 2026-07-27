@@ -44,7 +44,7 @@ Generate a compatible log and run the chosen analysis:
 
 ```sh
 eval "$(codelens print-log-command --after "$SINCE")" > git.log
-codelens <analysis> --log git.log --format json > data.json
+codelens <analysis> --log git.log > data.json
 ```
 
 Discover any analysis's flags and columns with `codelens schema --command

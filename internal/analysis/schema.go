@@ -16,7 +16,7 @@ import (
 //
 // Membership is derived from the command tree, not copied from prose:
 //   - the log-parse and log-content codes (parse_error, invalid_control_char)
-//     and every global-flag/output code (unknown_format, invalid_field,
+//     and every global-flag/output code (invalid_field,
 //     invalid_glob, invalid_group, invalid_team_map, invalid_temporal_period,
 //     invalid_temporal_date, log_open_failed, input_file_open_failed) are
 //     sentinels reachable on any run;
@@ -46,7 +46,6 @@ var commonErrorCodes = []string{
 	"missing_required_flag",
 	"parse_error",
 	"unknown_flag",
-	"unknown_format",
 }
 
 // CommonErrorCodes returns a copy of the tool-level error baseline (see
@@ -69,9 +68,13 @@ type CommandSchema struct {
 	Command       string   `json:"command"`
 	Summary       string   `json:"summary"`
 	Aliases       []string `json:"aliases"`
-	Flags         []Flag   `json:"flags"`
-	RowSchema     []Column `json:"row_schema"`
-	ErrorCodes    []string `json:"error_codes"`
+	// Shape names the topology of this command's payload (see Shapes). Omitted
+	// when empty: the schema command declares no shape because its output is an
+	// introspection envelope, not an analysis result.
+	Shape      string   `json:"shape,omitempty"`
+	Flags      []Flag   `json:"flags"`
+	RowSchema  []Column `json:"row_schema"`
+	ErrorCodes []string `json:"error_codes"`
 	// CommonErrorCodes lists the codes any invocation of this tool can produce
 	// (input, option, and output-layer failures), declared once at tool level.
 	// ErrorCodes carries only the codes distinctive to this command, so an agent
@@ -123,6 +126,7 @@ func Schema(d Descriptor) CommandSchema {
 		Command:          d.Name,
 		Summary:          d.Summary,
 		Aliases:          nonNilStrings(d.Aliases),
+		Shape:            d.Shape,
 		Flags:            nonNilFlags(d.Flags),
 		RowSchema:        nonNilColumns(d.RowSchema),
 		ErrorCodes:       nonNilStrings(d.ErrorCodes),
@@ -136,14 +140,17 @@ func Schema(d Descriptor) CommandSchema {
 // log input and emit no rows, so their aliases and row schema are always empty.
 // The explicit parts are carried through and every slice is normalised to
 // non-nil so the schema marshals as [] rather than null, matching Schema(d).
-// Analyses use Schema(d) instead.
-func MetaSchema(command, summary string, flags []Flag, errorCodes []string, exitCodes []int) CommandSchema {
+// shape is passed as-is: print-log-command declares ShapeText, while schema
+// declares "" (it is the introspection surface, not an analysis result) so the
+// omitempty key is absent from its schema. Analyses use Schema(d) instead.
+func MetaSchema(command, summary, shape string, flags []Flag, errorCodes []string, exitCodes []int) CommandSchema {
 	return CommandSchema{
 		SchemaVersion:    output.SchemaVersion,
 		OK:               true,
 		Command:          command,
 		Summary:          summary,
 		Aliases:          []string{},
+		Shape:            shape,
 		Flags:            nonNilFlags(flags),
 		RowSchema:        []Column{},
 		ErrorCodes:       nonNilStrings(errorCodes),

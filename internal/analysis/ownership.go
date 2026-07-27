@@ -29,11 +29,12 @@ func ownershipDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "entity-ownership",
 		Summary: "Per-author churn contribution to each entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "author", Type: "string", Desc: "author who contributed to the entity"},
-			{Name: "added", Type: "int", Desc: "lines the author added to the entity"},
-			{Name: "deleted", Type: "int", Desc: "lines the author deleted from the entity"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "author", Type: "string", Semantic: SemanticPerson, Desc: "author who contributed to the entity"},
+			{Name: "added", Type: "int", Semantic: SemanticLoc, Desc: "lines the author added to the entity"},
+			{Name: "deleted", Type: "int", Semantic: SemanticLoc, Desc: "lines the author deleted from the entity"},
 		},
 		ErrorCodes: []string{"empty_log", "missing_metrics"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

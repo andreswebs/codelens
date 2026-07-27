@@ -43,12 +43,13 @@ func codeAgeDescriptor() Descriptor {
 		Name:    "code-age",
 		Aliases: []string{"age"},
 		Summary: "Age in months since last modification",
+		Shape:   ShapeTable,
 		Flags: []Flag{
 			{Name: "time-now", Type: "string", Default: "", Required: false, Desc: "YYYY-MM-dd \"time zero\" for age (default: today, UTC)"},
 		},
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "age_months", Type: "int", Desc: "whole calendar months since the last change before time-now"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "age_months", Type: "int", Semantic: SemanticDurationMonths, Desc: "whole calendar months since the last change before time-now"},
 		},
 		ErrorCodes: []string{"empty_log", "invalid_time_now"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

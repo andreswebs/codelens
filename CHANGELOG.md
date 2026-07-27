@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Canonical shape-aware envelope: `shape`, `semantics`, `transforms` (ADR
+  0008).** Every analysis envelope is now self-describing along two new axes.
+  `shape` names the payload topology (`table` today; `tree`, `graph`, `matrix`,
+  and `series` are declared for future analyses) and the payload key follows from
+  it. `semantics` maps each emitted payload field to a semantic type from a closed
+  12-member vocabulary (`filepath`, `person`, `date`, `commit_id`, `text`,
+  `label`, `flag`, `count`, `loc`, `percentage`, `ratio`, `duration_months`), so a
+  downstream renderer can derive a chart without domain knowledge; it is always
+  present, marshaling as `{}` when empty. `transforms` records the active pipeline
+  transforms (`include`, `exclude`, `group`, `temporal_period`, `team_map`) and is
+  omitted entirely when the pipeline was a pass-through. `schema --command CMD`
+  now declares `shape` and a per-column `semantic` for every command, meta
+  commands included; `print-log-command` declares `shape: "text"`. All three
+  envelope fields are additive, so `schema_version` stays at `1`; a consumer that
+  ignores unknown keys is unaffected (the format-matrix removal below is a
+  CLI-surface break, not an envelope break).
+
+  Two rules govern `semantics` and are frozen by conformance tests. Semantics
+  track FLAGS, never data: `coupling` without `--verbose` omits its three verbose
+  columns, while `parse` always lists `loc_added`/`loc_deleted`/`binary` (their
+  absence is per-row), so the map is deterministic for a given command line. And a
+  transform degrades a semantic only when it destroys a structural affordance:
+  under `--group` a splittable `filepath` becomes an opaque `label`, while
+  `--team-map` keeps `author` as `person` (a team name and a person name are both
+  opaque categorical actor labels). Because the schema declares the command's
+  untransformed default and the envelope declares the invocation, the two can
+  legitimately disagree (`schema` says `filepath`, a grouped envelope says
+  `label`).
+
 - **Tool-level error surface in `schema`.** Two additive schema fields let an
   agent enumerate the full error surface at runtime. `schema --command CMD` now
   carries `common_error_codes`, the tool-level baseline any invocation can
@@ -51,6 +80,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   envelopes are unchanged (same codes, hints, and exit codes).
 
 ### Removed
+
+- **Breaking: the `--format` matrix and the alternate serializers (ADR 0008).**
+  codelens now emits exactly one representation on stdout: the canonical JSON
+  envelope. The `--format` flag and its `json`, `ndjson`, `csv`, and `table`
+  values are gone, as is the code-maat-compatible CSV with its kebab-case column
+  headers. Consumers that read `ndjson`, `csv`, or `table` must migrate to the
+  JSON envelope; the `shape` and `semantics` fields added above make a downstream
+  reshaping (to NDJSON, CSV, or any chart spec) mechanical. An invocation passing
+  `--format` now exits 64 with an `unknown_flag` error envelope, and the
+  `unknown_format` error code is retired. This is a CLI-surface break, not an
+  envelope break, so `schema_version` stays at `1`.
 
 - **Breaking: `--debug` removed.** codelens adopts the silent logging posture
   (ADR 0005, local), so it carries no logging infrastructure. The `--debug`

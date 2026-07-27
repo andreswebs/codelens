@@ -1,9 +1,9 @@
 # codelens golden test fixtures
 
 `authors.log` is the shared input log that drives the golden end-to-end tests in
-`golden_test.go`. The goldens freeze the output/CLI spine (every format,
-`--fields`, `--rows`, `schema`, the usage and data errors, the renamed I/O and
-format error codes, and the coupling warning) as reviewable diffs.
+`golden_test.go`. The goldens freeze the output/CLI spine (the JSON envelope,
+`--fields`, `--rows`, `schema`, the usage and data errors, the renamed I/O error
+codes, and the coupling warning) as reviewable diffs.
 
 ## Origin and license
 

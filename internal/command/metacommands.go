@@ -16,7 +16,12 @@ import (
 type metaCommand struct {
 	Name    string
 	Summary string
-	Flags   []analysis.Flag // declared in the analysis.Flag shape; reused by toCLIFlag
+	// Shape names the topology of this meta command's stdout (see analysis.Shapes).
+	// print-log-command declares analysis.ShapeText so an agent learns its stdout
+	// is a bare command line, not JSON; schema declares "" because its stdout is an
+	// introspection envelope, not an analysis result.
+	Shape string
+	Flags []analysis.Flag // declared in the analysis.Flag shape; reused by toCLIFlag
 	// ErrorCodes lists only the terr codes DISTINCTIVE to this meta command,
 	// beyond the common baseline every command reports as a schema's
 	// CommonErrorCodes. The full reachable surface is CommonErrorCodes plus this
@@ -36,6 +41,7 @@ func metaCommands() []metaCommand {
 		{
 			Name:    "print-log-command",
 			Summary: printLogCommandUsage,
+			Shape:   analysis.ShapeText,
 			Flags: []analysis.Flag{
 				{Name: "after", Type: "string", Desc: "limit history to commits after `DATE` (YYYY-MM-DD)"},
 				{Name: "all", Type: "bool", Default: false, Desc: "include all refs (default: current branch only)"},
@@ -47,6 +53,9 @@ func metaCommands() []metaCommand {
 		{
 			Name:    "schema",
 			Summary: schemaUsage,
+			// schema emits its own introspection envelope, which is not an analysis
+			// result, so it declares no shape.
+			Shape: "",
 			Flags: []analysis.Flag{
 				{Name: "command", Type: "string", Desc: "describe a single `CMD` in full (flags, row schema, codes)"},
 			},
@@ -84,7 +93,7 @@ func (m metaCommand) summary() analysis.CommandSummary {
 // schema projects the meta command to its full, self-describing schema, served
 // by `schema --command <meta>`.
 func (m metaCommand) schema() analysis.CommandSchema {
-	return analysis.MetaSchema(m.Name, m.Summary, m.Flags, m.ErrorCodes, m.ExitCodes)
+	return analysis.MetaSchema(m.Name, m.Summary, m.Shape, m.Flags, m.ErrorCodes, m.ExitCodes)
 }
 
 // metaCLICommands maps the meta table to the cli.Commands the root wires in.

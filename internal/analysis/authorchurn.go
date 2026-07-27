@@ -29,11 +29,12 @@ func authorChurnDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "author-churn",
 		Summary: "Lines added/deleted per author",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "author", Type: "string", Desc: "commit author"},
-			{Name: "added", Type: "int", Desc: "lines added by the author"},
-			{Name: "deleted", Type: "int", Desc: "lines deleted by the author"},
-			{Name: "commits", Type: "int", Desc: "number of distinct revisions by the author"},
+			{Name: "author", Type: "string", Semantic: SemanticPerson, Desc: "commit author"},
+			{Name: "added", Type: "int", Semantic: SemanticLoc, Desc: "lines added by the author"},
+			{Name: "deleted", Type: "int", Semantic: SemanticLoc, Desc: "lines deleted by the author"},
+			{Name: "commits", Type: "int", Semantic: SemanticCount, Desc: "number of distinct revisions by the author"},
 		},
 		ErrorCodes: []string{"empty_log", "missing_metrics"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

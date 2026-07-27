@@ -28,10 +28,11 @@ func fragmentationDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "fragmentation",
 		Summary: "Author fragmentation (fractal value) per entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "fractal_value", Type: "float", Desc: "authorship spread, 0 (one author) toward 1 (many equal authors), 2 significant digits"},
-			{Name: "total_revs", Type: "int", Desc: "total revisions of the entity across all authors"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "fractal_value", Type: "float", Semantic: SemanticRatio, Desc: "authorship spread, 0 (one author) toward 1 (many equal authors), 2 significant digits"},
+			{Name: "total_revs", Type: "int", Semantic: SemanticCount, Desc: "total revisions of the entity across all authors"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

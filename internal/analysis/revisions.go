@@ -25,9 +25,10 @@ func revisionsDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "revisions",
 		Summary: "Change frequency per entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "n_revs", Type: "int", Desc: "number of distinct revisions"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "n_revs", Type: "int", Semantic: SemanticCount, Desc: "number of distinct revisions"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

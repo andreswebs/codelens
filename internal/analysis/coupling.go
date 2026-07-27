@@ -35,6 +35,7 @@ func couplingDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "coupling",
 		Summary: "Logical (temporal) coupling between entity pairs",
+		Shape:   ShapeTable,
 		Flags: []Flag{
 			{Name: "min-revs", Type: "int", Default: 5, Desc: "minimum revisions for a pair's average to be included"},
 			{Name: "min-shared-revs", Type: "int", Default: 5, Desc: "minimum shared revisions for a pair"},
@@ -44,13 +45,13 @@ func couplingDescriptor() Descriptor {
 			{Name: "verbose", Type: "bool", Default: false, Desc: "add per-pair revision detail columns"},
 		},
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "coupled", Type: "string", Desc: "co-changing module path"},
-			{Name: "degree", Type: "int", Desc: "coupling strength, percent 0-100"},
-			{Name: "average_revs", Type: "int", Desc: "average revisions of the pair (ceil)"},
-			{Name: "first_entity_revisions", Type: "int", Desc: "revisions of entity (--verbose only)"},
-			{Name: "second_entity_revisions", Type: "int", Desc: "revisions of coupled (--verbose only)"},
-			{Name: "shared_revisions", Type: "int", Desc: "revisions both changed in (--verbose only)"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "coupled", Type: "string", Semantic: SemanticFilepath, Desc: "co-changing module path"},
+			{Name: "degree", Type: "int", Semantic: SemanticPercentage, Desc: "coupling strength, percent 0-100"},
+			{Name: "average_revs", Type: "int", Semantic: SemanticCount, Desc: "average revisions of the pair (ceil)"},
+			{Name: "first_entity_revisions", Type: "int", Semantic: SemanticCount, Desc: "revisions of entity (--verbose only)", FlagGated: "verbose"},
+			{Name: "second_entity_revisions", Type: "int", Semantic: SemanticCount, Desc: "revisions of coupled (--verbose only)", FlagGated: "verbose"},
+			{Name: "shared_revisions", Type: "int", Semantic: SemanticCount, Desc: "revisions both changed in (--verbose only)", FlagGated: "verbose"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

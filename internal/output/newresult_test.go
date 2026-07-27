@@ -8,7 +8,7 @@ import (
 
 func TestNewResult_Invariants(t *testing.T) {
 	rows := []int{1, 2, 3}
-	r := output.NewResult("coupling", rows)
+	r := output.NewResult(output.Meta{Analysis: "coupling", Shape: "table"}, rows)
 
 	if r.SchemaVersion != output.SchemaVersion {
 		t.Errorf("SchemaVersion = %d, want %d", r.SchemaVersion, output.SchemaVersion)
@@ -22,24 +22,27 @@ func TestNewResult_Invariants(t *testing.T) {
 	if r.RowCount != 3 {
 		t.Errorf("RowCount = %d, want 3", r.RowCount)
 	}
-	got, ok := r.Rows.([]int)
+	if r.Shape != "table" {
+		t.Errorf("Shape = %q, want %q", r.Shape, "table")
+	}
+	got, ok := r.Payload.([]int)
 	if !ok || len(got) != 3 {
-		t.Errorf("Rows = %#v, want passthrough []int{1,2,3}", r.Rows)
+		t.Errorf("Payload = %#v, want passthrough []int{1,2,3}", r.Payload)
 	}
 }
 
 func TestNewResult_EmptySlice(t *testing.T) {
-	r := output.NewResult("authors", []int{})
+	r := output.NewResult(output.Meta{Analysis: "authors", Shape: "table"}, []int{})
 	if r.RowCount != 0 {
 		t.Errorf("RowCount = %d, want 0 for empty slice", r.RowCount)
 	}
-	if r.Rows == nil {
-		t.Error("Rows = nil, want the empty slice passed through")
+	if r.Payload == nil {
+		t.Error("Payload = nil, want the empty slice passed through")
 	}
 }
 
 func TestNewResult_NilRows(t *testing.T) {
-	r := output.NewResult("authors", nil)
+	r := output.NewResult(output.Meta{Analysis: "authors", Shape: "table"}, nil)
 	if r.RowCount != 0 {
 		t.Errorf("RowCount = %d, want 0 for nil rows", r.RowCount)
 	}

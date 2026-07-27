@@ -32,12 +32,13 @@ func communicationDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "communication",
 		Summary: "Heuristic communication strength between author pairs",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "author", Type: "string", Desc: "subject author of the pair"},
-			{Name: "peer", Type: "string", Desc: "co-working author"},
-			{Name: "shared", Type: "int", Desc: "entities both authors have worked on"},
-			{Name: "average", Type: "int", Desc: "ceil of the mean entity count of the two authors"},
-			{Name: "strength", Type: "int", Desc: "shared as a percentage of average, 0-100"},
+			{Name: "author", Type: "string", Semantic: SemanticPerson, Desc: "subject author of the pair"},
+			{Name: "peer", Type: "string", Semantic: SemanticPerson, Desc: "co-working author"},
+			{Name: "shared", Type: "int", Semantic: SemanticCount, Desc: "entities both authors have worked on"},
+			{Name: "average", Type: "int", Semantic: SemanticCount, Desc: "ceil of the mean entity count of the two authors"},
+			{Name: "strength", Type: "int", Semantic: SemanticPercentage, Desc: "shared as a percentage of average, 0-100"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

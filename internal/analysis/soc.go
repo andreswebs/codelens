@@ -27,12 +27,13 @@ func socDescriptor() Descriptor {
 		Name:    "sum-of-coupling",
 		Aliases: []string{"soc"},
 		Summary: "Sum of coupling per entity",
+		Shape:   ShapeTable,
 		Flags: []Flag{
 			{Name: "min-revs", Type: "int", Default: 5, Desc: "minimum sum-of-coupling (exclusive) for an entity to be included"},
 		},
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "soc", Type: "int", Desc: "number of shared transactions"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "soc", Type: "int", Semantic: SemanticCount, Desc: "number of shared transactions"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

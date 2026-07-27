@@ -1,6 +1,6 @@
 ---
 id: cod-4typ
-status: open
+status: closed
 deps: [cod-fb72]
 links: []
 created: 2026-07-27T13:05:46Z
@@ -430,3 +430,22 @@ internal/command/testdata/*.out            regenerate (one new key)
   `shape` key; all `.err` and `.exit` files are unchanged.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-27T14:03:16Z**
+
+Added the shape field and shape-derived payload marshaling (D5,D7,D7a,D8,D12).
+
+Code:
+- internal/analysis/shape.go (new): closed shape enum (table/tree/graph/matrix/series/text), Shapes(), ValidShape().
+- Descriptor.Shape added; all 18 analysis descriptors set Shape: ShapeTable.
+- CommandSchema.Shape (json:"shape,omitempty"), placed after aliases; Schema() passes d.Shape; MetaSchema() gained a shape param. metaCommand.Shape: print-log-command=text, schema="" (omitted).
+- output.Result reshaped: metadata fields are json:"-" plus a single Payload any; a custom MarshalJSON (via an ordered fieldWriter) fixes the golden key order schema_version,ok,analysis,shape,[semantics/transforms slots reserved],params,row_count,total_count,truncated,<payload_key>. payloadKey() returns rows for table and panics for the four not-yet-emitted shapes.
+- output/meta.go (new): Meta{Analysis,Shape,Columns} + NewResult(meta,payload); RowLen stays in newresult.go (old 2-arg NewResult removed).
+- output/fields.go: --fields validation moved OFF struct reflection onto the marshaled JSON tree, unioned with payloadKey(shape).<column> for declared columns (fixes latent D7a bug: rows.entity now valid on an empty payload). shape force-retained under projection (D6). params.* wildcard preserved via Result.wildcardPaths(). EmitProjected/ValidateFields gained a declared []string param; EmitProjected reuses the single marshal.
+- commands.go: columnNames revived (now feeds Meta.Columns + --fields seeding, not csv headers); truncate() retargeted to res.Payload.
+
+Goldens: only shape:"table" added (authors_json/rows2/fields/coupling_warning after analysis; authors_schema after aliases). schema_list unchanged by this ticket (the unknown_format removal there is cod-fb72's). All .err/.exit unchanged.
+
+Next: cod-435u adds semantics + transforms into the reserved marshaler slots and Meta.

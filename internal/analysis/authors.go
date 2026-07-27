@@ -26,10 +26,11 @@ func authorsDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "authors",
 		Summary: "Number of distinct authors per entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "n_authors", Type: "int", Desc: "distinct authors that touched it"},
-			{Name: "n_revs", Type: "int", Desc: "revisions of the entity"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "n_authors", Type: "int", Semantic: SemanticCount, Desc: "distinct authors that touched it"},
+			{Name: "n_revs", Type: "int", Semantic: SemanticCount, Desc: "revisions of the entity"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

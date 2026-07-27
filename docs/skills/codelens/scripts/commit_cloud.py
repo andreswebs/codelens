@@ -15,7 +15,7 @@ time: domain terms are healthy; "bug", "crash", "revert", "bump" warrant a
 drill-down.
 
 Usage:
-  codelens parse --format json | uv run scripts/commit_cloud.py -o cloud.svg
+  codelens parse | uv run scripts/commit_cloud.py -o cloud.svg
   uv run scripts/commit_cloud.py -i parse.json --extra-stopwords bump,wip -o cloud.svg
 Exit codes: 0 ok; 2 usage; 3 no messages.
 """

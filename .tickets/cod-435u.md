@@ -1,6 +1,6 @@
 ---
 id: cod-435u
-status: open
+status: closed
 deps: [cod-4typ]
 links: []
 created: 2026-07-27T13:10:47Z
@@ -470,3 +470,21 @@ CHANGELOG.md                               Unreleased: Removed + Added entries
   envelope fields, the new per-column `semantic`, and states why `schema_version` stays 1.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-27T14:15:15Z**
+
+Implemented semantics + transforms on the envelope (spec-002 D3/D3a-c/D4/D4a/D4b/D6/D9/D15).
+
+New: internal/analysis/semantics.go (12-member closed vocabulary, Semantics(), ValidSemantic(), SemanticsOf() with FlagGated omit). Column gains Semantic (json:"semantic") + FlagGated (json:"-"). All 71 (analysis,column) pairs assigned per the design table; main-developer-by-revisions added/total_added are count (revisions), not loc (D3c) - has an inline comment guarding the copy-paste trap. coupling's 3 verbose columns carry FlagGated:"verbose".
+
+Output: Result/Meta gain Semantics (always present, marshals {} when nil, right after shape) and Transforms (omitted when pipeline is pass-through, snake_case keys). fields.go: ProjectFields now takes payloadKey; retains transforms and narrows semantics to surviving payload fields (D6).
+
+Command: semanticsFor() builds the map (D15 flag filter + D4 group degradation: filepath->label applied generically so coupled is covered too); transformsRecord() records include/exclude/group/temporal_period/team_map. schema --command still declares the untransformed default (filepath) - the schema/envelope asymmetry is deliberate and pinned by TestSemantics_GroupDegradesToLabel.
+
+Tests: conformance in schema_test.go (every column has a valid non-empty semantic); internal/command/semantics_test.go (flag gating 4 vs 7, parse tracks-flags-not-data, group->label + schema-says-filepath, team-map keeps person, transforms absent/present, --fields filtering); output fields_test + types_test. New goldens authors_grouped and coupling_verbose; testdata fixtures layers.group and teams.csv. All .err/.exit for pre-existing scenarios unchanged.
+
+CHANGELOG [Unreleased]: Added entry for shape/semantics/transforms + per-column semantic; Removed entry for the format matrix (breaking); both note schema_version stays 1 (additive envelope keys; the removal is a CLI-surface break).
+
+make build green.

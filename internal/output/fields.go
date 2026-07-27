@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -20,16 +19,49 @@ var ErrInvalidField = terr.New("invalid_field", 64, "see `codelens schema --comm
 const wildcard = "*"
 
 // ValidateFields parses a comma-separated field-projection spec and validates
-// each dotted path against the shape of envelope. An empty spec yields (nil,
-// nil), meaning "no projection". An unknown path yields ErrInvalidField wrapped
-// with the offending path and the sorted set of valid paths, so an agent can
-// correct the request from the error alone.
-func ValidateFields(paths string, envelope any) ([]string, error) {
+// each dotted path against the envelope's ACTUAL emitted shape, unioned with the
+// payload field paths the command declares. An empty spec yields (nil, nil),
+// meaning "no projection". An unknown path yields ErrInvalidField wrapped with the
+// offending path and the sorted set of valid paths, so an agent can correct the
+// request from the error alone.
+//
+// Taking the declared columns from the schema rather than from the data is what
+// keeps a projection valid on an empty payload: the data alone exposes no field
+// paths when the payload is []. declared is the ordered column-name list for the
+// command's payload; it is prefixed with the payload key the envelope's shape
+// dictates.
+func ValidateFields(paths string, envelope any, declared []string) ([]string, error) {
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, err
+	}
+	return validateFieldsData(paths, data, envelope, declared)
+}
+
+// validateFieldsData validates paths against already-marshaled envelope bytes so
+// the emit path can reuse the marshal rather than encoding twice. envelope is
+// still passed to recover the payload key and the map-typed wildcard paths, which
+// the JSON bytes alone cannot distinguish (a fixed-key row object and an
+// open-key params object both decode to a JSON object).
+func validateFieldsData(paths string, data []byte, envelope any, declared []string) ([]string, error) {
 	if strings.TrimSpace(paths) == "" {
 		return nil, nil
 	}
 
-	valid := collectValidPaths(envelope)
+	valid, err := collectJSONPaths(data)
+	if err != nil {
+		return nil, err
+	}
+	if r, ok := envelope.(Result); ok {
+		key := payloadKey(r.Shape)
+		for _, c := range declared {
+			valid[join(key, c)] = struct{}{}
+		}
+		for _, p := range r.wildcardPaths() {
+			valid[p] = struct{}{}
+		}
+	}
+
 	fields := splitFields(paths)
 	for _, field := range fields {
 		if !pathMatches(field, valid) {
@@ -42,10 +74,13 @@ func ValidateFields(paths string, envelope any) ([]string, error) {
 }
 
 // ProjectFields re-marshals already-encoded envelope JSON down to only the
-// requested field paths, always retaining schema_version and ok so the result
-// stays a recognizable envelope. It operates on the decoded JSON tree rather
-// than Go types, so projection is independent of the concrete row type.
-func ProjectFields(data []byte, fields []string) ([]byte, error) {
+// requested field paths, always retaining schema_version, ok, shape, transforms
+// (when present), and a semantics map narrowed to the surviving payload fields, so
+// the result stays a recognizable, self-describing envelope (D6). It operates on
+// the decoded JSON tree rather than Go types, so projection is independent of the
+// concrete payload type. payloadKey is the envelope's payload key (e.g. "rows"),
+// used to intersect semantics with the fields the projection kept.
+func ProjectFields(data []byte, fields []string, payloadKey string) ([]byte, error) {
 	var root any
 	if err := json.Unmarshal(data, &root); err != nil {
 		return nil, err
@@ -54,28 +89,82 @@ func ProjectFields(data []byte, fields []string) ([]byte, error) {
 	tree := buildProjectionTree(fields)
 	tree["schema_version"] = nil
 	tree["ok"] = nil
+	tree["shape"] = nil      // always self-describing, even when projected (D6)
+	tree["transforms"] = nil // retained when present, it justifies an adjusted semantic (D6)
 
 	projected := applyProjection(root, tree)
+	if m, ok := projected.(map[string]any); ok {
+		m["semantics"] = projectSemantics(root, tree, payloadKey)
+	}
 	return json.Marshal(projected)
+}
+
+// projectSemantics narrows the semantics map to the payload fields the projection
+// kept, so a projected envelope stays self-describing without advertising fields
+// it dropped. A projection that keeps the whole payload (a "rows" leaf or a
+// wildcard under it) keeps every semantic; otherwise it intersects the semantics
+// keys with the payload subtree's keys. A projection that keeps no payload field
+// yields an empty map, not a missing key.
+func projectSemantics(root any, tree map[string]any, payloadKey string) map[string]any {
+	rootMap, ok := root.(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+	sem, ok := rootMap["semantics"].(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+
+	sub, present := tree[payloadKey]
+	if !present {
+		return map[string]any{}
+	}
+	subTree, ok := sub.(map[string]any)
+	if !ok {
+		// A leaf (the whole payload was requested, e.g. --fields rows): keep all.
+		return sem
+	}
+	if _, wild := subTree[wildcard]; wild {
+		return sem
+	}
+
+	out := make(map[string]any, len(subTree))
+	for field := range subTree {
+		if v, ok := sem[field]; ok {
+			out[field] = v
+		}
+	}
+	return out
 }
 
 // EmitProjected writes envelope to w as JSON, projected to fieldsStr when it is
 // non-empty. An empty fieldsStr is byte-identical to EmitJSON, so the projection
-// path never perturbs the default output.
-func EmitProjected(w io.Writer, envelope any, fieldsStr string) error {
-	fields, err := ValidateFields(fieldsStr, envelope)
-	if err != nil {
-		return err
-	}
-	if fields == nil {
-		return EmitJSON(w, envelope)
-	}
-
+// path never perturbs the default output. declared is the command's payload
+// column-name list, seeding the valid-path set so a projection stays valid on an
+// empty payload.
+func EmitProjected(w io.Writer, envelope any, fieldsStr string, declared []string) error {
 	data, err := json.Marshal(envelope)
 	if err != nil {
 		return err
 	}
-	projected, err := ProjectFields(data, fields)
+
+	fields, err := validateFieldsData(fieldsStr, data, envelope, declared)
+	if err != nil {
+		return err
+	}
+	if fields == nil {
+		if _, err := w.Write(data); err != nil {
+			return err
+		}
+		_, err = w.Write([]byte{'\n'})
+		return err
+	}
+
+	key := ""
+	if r, ok := envelope.(Result); ok {
+		key = payloadKey(r.Shape)
+	}
+	projected, err := ProjectFields(data, fields, key)
 	if err != nil {
 		return err
 	}
@@ -84,6 +173,36 @@ func EmitProjected(w io.Writer, envelope any, fieldsStr string) error {
 	}
 	_, err = w.Write([]byte{'\n'})
 	return err
+}
+
+// collectJSONPaths decodes marshaled envelope bytes and returns the set of every
+// dotted path the JSON exposes. Objects contribute each key and recurse; arrays
+// recurse into their first element, so a non-empty payload exposes its row field
+// paths while an empty one exposes none (the declared columns cover that case).
+func collectJSONPaths(data []byte) (map[string]struct{}, error) {
+	var root any
+	if err := json.Unmarshal(data, &root); err != nil {
+		return nil, err
+	}
+	out := make(map[string]struct{})
+	walkJSON(root, "", out)
+	return out, nil
+}
+
+// walkJSON records each reachable dotted path of v under prefix.
+func walkJSON(v any, prefix string, out map[string]struct{}) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, child := range t {
+			path := join(prefix, k)
+			out[path] = struct{}{}
+			walkJSON(child, path, out)
+		}
+	case []any:
+		if len(t) > 0 {
+			walkJSON(t[0], prefix, out)
+		}
+	}
 }
 
 // splitFields splits a comma-separated spec into trimmed, non-empty paths.
@@ -125,93 +244,6 @@ func segmentsMatch(req, valid []string) bool {
 		}
 	}
 	return true
-}
-
-// collectValidPaths reflects over envelope and returns the set of every dotted
-// path it exposes. Map-typed fields contribute a "*" wildcard path plus any
-// keys present in the value.
-func collectValidPaths(envelope any) map[string]struct{} {
-	out := make(map[string]struct{})
-	collectPaths(reflect.ValueOf(envelope), "", out)
-	return out
-}
-
-// collectPaths walks v, recording each reachable json path under prefix. It
-// descends through pointers and interfaces, into struct fields by json tag,
-// into slice/array elements (using a zero element when empty), and across map
-// keys plus the wildcard.
-func collectPaths(v reflect.Value, prefix string, out map[string]struct{}) {
-	v = deref(v)
-	if !v.IsValid() {
-		return
-	}
-
-	switch v.Kind() {
-	case reflect.Struct:
-		t := v.Type()
-		for i := range t.NumField() {
-			f := t.Field(i)
-			if !f.IsExported() {
-				continue
-			}
-			name, ok := jsonFieldName(f)
-			if !ok {
-				continue
-			}
-			path := join(prefix, name)
-			out[path] = struct{}{}
-			collectPaths(v.Field(i), path, out)
-		}
-	case reflect.Slice, reflect.Array:
-		collectPaths(elemValue(v), prefix, out)
-	case reflect.Map:
-		out[join(prefix, wildcard)] = struct{}{}
-		for _, k := range v.MapKeys() {
-			key := fmt.Sprint(k.Interface())
-			path := join(prefix, key)
-			out[path] = struct{}{}
-			collectPaths(v.MapIndex(k), path, out)
-		}
-	}
-}
-
-// deref unwraps pointers and interfaces, returning an invalid Value if a nil
-// link is reached (nothing further to reflect on).
-func deref(v reflect.Value) reflect.Value {
-	for v.IsValid() && (v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface) {
-		if v.IsNil() {
-			return reflect.Value{}
-		}
-		v = v.Elem()
-	}
-	return v
-}
-
-// elemValue returns the first element of a non-empty slice/array, or a zero
-// value of the element type so an empty slice still yields its nested paths.
-func elemValue(v reflect.Value) reflect.Value {
-	if v.Len() > 0 {
-		return v.Index(0)
-	}
-	return reflect.New(v.Type().Elem()).Elem()
-}
-
-// jsonFieldName returns the json object key for a struct field and whether it
-// is serialized at all (false for json:"-"). An absent tag falls back to the
-// field name, matching encoding/json.
-func jsonFieldName(f reflect.StructField) (string, bool) {
-	tag := f.Tag.Get("json")
-	if tag == "-" {
-		return "", false
-	}
-	name := tag
-	if comma := strings.Index(tag, ","); comma >= 0 {
-		name = tag[:comma]
-	}
-	if name == "" {
-		name = f.Name
-	}
-	return name, true
 }
 
 // join concatenates a path prefix and a segment with a dot, or returns the

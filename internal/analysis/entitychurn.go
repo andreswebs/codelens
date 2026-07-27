@@ -29,11 +29,12 @@ func entityChurnDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "entity-churn",
 		Summary: "Lines added/deleted per entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "added", Type: "int", Desc: "lines added to the entity"},
-			{Name: "deleted", Type: "int", Desc: "lines deleted from the entity"},
-			{Name: "commits", Type: "int", Desc: "number of distinct revisions touching the entity"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "added", Type: "int", Semantic: SemanticLoc, Desc: "lines added to the entity"},
+			{Name: "deleted", Type: "int", Semantic: SemanticLoc, Desc: "lines deleted from the entity"},
+			{Name: "commits", Type: "int", Semantic: SemanticCount, Desc: "number of distinct revisions touching the entity"},
 		},
 		ErrorCodes: []string{"empty_log", "missing_metrics"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

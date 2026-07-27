@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":true,"analysis":"authors","shape":"table","semantics":{"entity":"label","n_authors":"count","n_revs":"count"},"transforms":{"group":true},"row_count":3,"rows":[{"entity":"parsers","n_authors":2,"n_revs":4},{"entity":"analysis","n_authors":1,"n_revs":1},{"entity":"docs","n_authors":1,"n_revs":1}]}

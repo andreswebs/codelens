@@ -30,11 +30,12 @@ func entityEffortDescriptor() Descriptor {
 	return Descriptor{
 		Name:    "entity-effort",
 		Summary: "Each author revision share per entity",
+		Shape:   ShapeTable,
 		RowSchema: []Column{
-			{Name: "entity", Type: "string", Desc: "module path"},
-			{Name: "author", Type: "string", Desc: "contributing author"},
-			{Name: "author_revs", Type: "int", Desc: "revisions the author contributed to the entity"},
-			{Name: "total_revs", Type: "int", Desc: "total revisions of the entity across all authors"},
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "author", Type: "string", Semantic: SemanticPerson, Desc: "contributing author"},
+			{Name: "author_revs", Type: "int", Semantic: SemanticCount, Desc: "revisions the author contributed to the entity"},
+			{Name: "total_revs", Type: "int", Semantic: SemanticCount, Desc: "total revisions of the entity across all authors"},
 		},
 		ErrorCodes: []string{"empty_log"},
 		ExitCodes:  []int{0, 64, 65, 70, 74},

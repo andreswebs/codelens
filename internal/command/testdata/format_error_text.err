@@ -1,1 +1,0 @@
-{"schema_version":1,"ok":false,"error":{"code":"empty_log","message":"the log is empty","hint":"provide a non-empty git2 log on stdin or via --log"}}

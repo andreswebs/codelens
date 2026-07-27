@@ -1359,3 +1359,102 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   lifecycles, child exit-status passthrough). codelens catches no signals and
   spawns no subprocesses, so the omission is a decision, recorded in a comment on
   the `goldenCase` type.
+
+## Envelope shape field + shape-derived payload marshaling (cod-4typ)
+
+- Moving `--fields` validation off struct reflection onto the marshaled JSON
+  tree (D7a) is what fixed a latent bug: the old reflection walker synthesized a
+  zero element for an empty slice, so `--fields rows.entity` only worked on an
+  empty result by accident. Sourcing the valid payload paths from the descriptor's
+  declared columns (`payloadKey(shape) + "." + column`) makes that case correct by
+  construction, independent of whether any row exists.
+- A JSON tree cannot distinguish an open-keyed map (`params`) from a fixed-key
+  struct (a `rows` element): both decode to `map[string]any`. So the `*` wildcard
+  that keeps `params.*` valid cannot be inferred from the marshaled bytes. It is
+  reintroduced explicitly by `Result.wildcardPaths()`, which lists only the
+  known map-typed envelope fields. Blanket-adding `*` to every JSON object would
+  wrongly make `rows.bogus` valid (it would match `rows.*`), so the wildcard set
+  must stay closed to the genuine maps.
+- The envelope key order is pinned by a custom `Result.MarshalJSON` writing
+  fields through an ordered `fieldWriter`, not by struct field order and never by
+  a `map[string]any` (encoding/json sorts map keys alphabetically, which would
+  scramble the contract order). The `semantics`/`transforms` slots are left as
+  comments in the marshaler so the follow-on ticket is an insertion, not a
+  reshuffle. Key order is asserted on raw bytes, since order is the golden
+  contract, not merely key presence.
+- `output.Meta` (built in `internal/command` from the descriptor) keeps
+  `internal/output` from importing `internal/analysis`; the dependency runs the
+  other way (`analysis` imports `output` for `SchemaVersion`). The payload lives
+  in one `Payload any` field written under `payloadKey(shape)`, so a table result
+  structurally cannot emit a `nodes` key. The four not-yet-emitted shapes panic
+  in `payloadKey`, matching `toCLIFlag`'s treatment of an unsupported flag type.
+
+## Envelope semantics map + transforms record (cod-435u)
+
+- Semantics are per (analysis, column), never per column name globally. The same
+  column name carries different meaning across analyses: `added`/`total_added`
+  are `loc` in `main-developer` but `count` in `main-developer-by-revisions`
+  (the latter counts revisions). An inline comment on those two columns guards
+  the copy-paste trap, since the identical names and adjacent files invite it.
+- "Semantics track flags, never data" (D15) is what keeps the map deterministic
+  for a command line. A column gated behind a flag that was not supplied is
+  omitted (its field can never appear); a column whose presence varies per row
+  (parse's loc metrics on a numstat-free log) is always listed. The gate is
+  declared on the descriptor as `Column.FlagGated` (kept off the schema via
+  `json:"-"`), so the command layer builds the omit set with no per-analysis
+  knowledge and the schema still declares the full untransformed vocabulary.
+- A transform degrades a semantic only when it destroys a STRUCTURAL AFFORDANCE.
+  `--group` turns a splittable `filepath` into an opaque `label` (path splitting
+  is gone), so a treemap builder does not split a layer name on `/` and produce
+  garbage. `--team-map` does NOT degrade `author`: a team name and a person name
+  are both opaque categorical actor labels, so `person` stands. The rule is
+  applied generically over the map (any `filepath` -> `label` under `--group`),
+  so `coupling.coupled` is covered without naming it.
+- The schema and the envelope can legitimately disagree, and that is not drift:
+  `schema --command` declares the command's untransformed default (`filepath`),
+  the envelope declares what THIS RUN emitted (`label` under `--group`). Both
+  halves are asserted in one test so a later reader does not "fix" the asymmetry.
+- `transforms` keys are snake_case (`temporal_period`, `team_map`) to match every
+  other envelope key, even though the source flags are kebab-case. `params` is the
+  deliberate exception: it stays keyed by flag name for compatibility. `group` and
+  `team_map` are booleans, not paths, so an envelope never leaks the caller's
+  filesystem layout.
+- Under `--fields`, `semantics` is narrowed to the surviving payload fields but
+  `transforms` is retained whenever present, because it is what justifies an
+  adjusted semantic (a grouped `entity` reported as `label` only makes sense next
+  to `transforms.group`). `ProjectFields` needed the payload key threaded in to
+  intersect semantics with the kept fields; a `rows` leaf or a `rows.*` wildcard
+  keeps the whole map.
+
+## Repo docs for the canonical envelope (cod-fj7t)
+
+- Generate doc examples by RUNNING the built binary, never by hand. Every
+  envelope example in README.md was produced by piping a testdata log through the
+  built `codelens` and pretty-printing it, so no example can drift from real
+  output. The projected (`--fields`) example in particular emits its keys in a
+  non-obvious order (`ok`, `rows`, `schema_version`, `semantics`, `shape`), which
+  a hand-written example would have gotten wrong.
+- The "ADR 0003" citations in `docs/cli-design.md` were a leftover from when the
+  output ADR was unnumbered: ADR 0003 is error handling, and one of the two
+  citations even linked a nonexistent `adr/0003-canonical-output-representation.md`.
+  Both now point at ADR 0008. When an ADR is renumbered, grep the whole tree for
+  the old number, not just the section you remember touching.
+- One representation replaced the format matrix because a single self-describing
+  envelope is what an agent can consume without a second call: the `--format`
+  `json`/`ndjson`/`csv`/`table` switch forced a caller to know the shape before
+  reading it, and `ndjson` dropped the metadata that made the result
+  interpretable. `semantics` is the load-bearing addition: it is the one asset
+  only codelens can provide (it authored the data), and it is what lets a
+  downstream renderer derive a chart without domain knowledge.
+- The doc surface encodes two rules a reader is otherwise likely to misread as
+  bugs: semantics track flags not data (a flag-gated column absent from the map
+  is deterministic, not a dropped field), and a transform degrades a semantic
+  only when it destroys a structural affordance (`--group` makes `entity` a
+  `label`; `--team-map` leaves `author` a `person`). Both are stated as decisions
+  in `docs/cli-design.md` section 6.2, alongside the schema-versus-envelope
+  asymmetry (the schema declares the command default; the envelope declares the
+  run).
+- Spec 001's requirements and plan were annotated, not rewritten (D11): a
+  delivered spec is a historical record whose requirement IDs closed tickets
+  still cite. The superseded note goes at the top and points at ADR 0008; the
+  requirement bodies stay byte-for-byte.

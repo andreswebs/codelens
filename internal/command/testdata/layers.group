@@ -1,0 +1,3 @@
+src/code_maat/parsers => parsers
+src/code_maat/analysis => analysis
+doc => docs

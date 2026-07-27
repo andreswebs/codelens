@@ -21,10 +21,8 @@ import (
 // globalFlags builds the flags shared by every analysis subcommand. They are
 // registered on the root command (not Local), so urfave inherits them into each
 // subcommand's flag set and resolves them via cmd's lineage regardless of
-// whether they appear before or after the subcommand name. format is bound to
-// the caller's destination so the top level always has a valid output format for
-// EmitError even when flag parsing fails before a subcommand's Action runs.
-func globalFlags(format *string) []cli.Flag {
+// whether they appear before or after the subcommand name.
+func globalFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
 			Name:  "log",
@@ -36,14 +34,8 @@ func globalFlags(format *string) []cli.Flag {
 			Usage: "character `ENC`oding of the log input",
 		},
 		&cli.StringFlag{
-			Name:        "format",
-			Value:       "json",
-			Usage:       "output `FMT`: json|ndjson|csv|table",
-			Destination: format,
-		},
-		&cli.StringFlag{
 			Name:  "fields",
-			Usage: "comma-separated JSON field `PATHS` to project (json only)",
+			Usage: "comma-separated JSON field `PATHS` to project",
 		},
 		&cli.IntFlag{
 			Name:  "rows",
@@ -168,11 +160,17 @@ func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 			return err
 		}
 
-		res := output.NewResult(d.Name, rows)
+		res := output.NewResult(output.Meta{
+			Analysis:   d.Name,
+			Shape:      d.Shape,
+			Semantics:  semanticsFor(cmd, d),
+			Transforms: transformsRecord(cmd),
+			Columns:    columnNames(d),
+		}, rows)
 		res.Params = effectiveParams(cmd, d)
 		truncate(&res, cmd.Int("rows"))
 
-		return output.Emit(cmd.Root().Writer, cmd.String("format"), res, columnNames(d), cmd.String("fields"))
+		return output.EmitProjected(cmd.Root().Writer, res, cmd.String("fields"), columnNames(d))
 	}
 }
 
@@ -230,16 +228,6 @@ func parseDefinition[T any](path, flag string, parse func(io.Reader) (T, error))
 	}
 	defer func() { _ = f.Close() }()
 	return parse(f)
-}
-
-// columnNames extracts the ordered snake_case row-schema column names from a
-// descriptor, the header/order source for the csv and table formats.
-func columnNames(d analysis.Descriptor) []string {
-	names := make([]string, len(d.RowSchema))
-	for i, c := range d.RowSchema {
-		names[i] = c.Name
-	}
-	return names
 }
 
 // openLog resolves the analysis input: stdin when --log is empty or "-", else
@@ -319,19 +307,102 @@ func effectiveParams(cmd *cli.Command, d analysis.Descriptor) map[string]any {
 	return params
 }
 
+// columnNames returns the descriptor's declared payload field names in order.
+// It is no longer a csv/table header source (that surface is gone): it seeds
+// output.Meta.Columns and the --fields valid-path set, so a projection like
+// --fields rows.entity stays valid even when the payload is empty.
+func columnNames(d analysis.Descriptor) []string {
+	names := make([]string, 0, len(d.RowSchema))
+	for _, c := range d.RowSchema {
+		names = append(names, c.Name)
+	}
+	return names
+}
+
+// semanticsFor builds the envelope's field-to-semantic map for this run: the
+// descriptor's declared semantics minus the columns excluded by an unset flag
+// (D15), then adjusted for the active transforms (D4). It is a pure function of
+// the descriptor and the parsed flags, so the map is deterministic for a given
+// command line.
+func semanticsFor(cmd *cli.Command, d analysis.Descriptor) map[string]string {
+	omit := make(map[string]bool)
+	for _, c := range d.RowSchema {
+		if c.FlagGated != "" && !cmd.Bool(c.FlagGated) {
+			omit[c.FlagGated] = true
+		}
+	}
+	sem := analysis.SemanticsOf(d, omit)
+	return adjustForTransforms(sem, cmd.String("group") != "")
+}
+
+// adjustForTransforms returns semantics describing what THIS RUN emitted. A
+// transform that destroys a field's structural affordance degrades its semantic:
+// --group replaces entity paths with layer names, so a filepath (splittable on
+// "/") becomes an opaque label. A transform that merely aggregates does NOT:
+// --team-map replaces an author with a team, and both are opaque categorical
+// actor names, so person stands (that is why only filepath is degraded here).
+//
+// This is why the schema and the envelope can disagree: the schema declares the
+// command's default (filepath), the envelope declares the invocation (label).
+// The rule is applied generically over the map rather than naming entity, so
+// coupling's coupled column is covered too.
+func adjustForTransforms(sem map[string]string, grouped bool) map[string]string {
+	if !grouped {
+		return sem
+	}
+	out := make(map[string]string, len(sem))
+	for name, s := range sem {
+		if s == analysis.SemanticFilepath {
+			s = analysis.SemanticLabel
+		}
+		out[name] = s
+	}
+	return out
+}
+
+// transformsRecord records which pipeline transforms actually ran (D4b), keyed in
+// snake_case to match every other envelope key even though the flags are
+// kebab-case (params keeps its flag-name keying for compatibility). It returns nil
+// when the pipeline was a pass-through, so the transforms key is omitted entirely.
+// group and team_map are booleans rather than paths: a local filesystem path is
+// noise for a consumer and leaks the caller's layout.
+func transformsRecord(cmd *cli.Command) map[string]any {
+	t := make(map[string]any)
+	if inc := cmd.StringSlice("include"); len(inc) > 0 {
+		t["include"] = inc
+	}
+	if exc := cmd.StringSlice("exclude"); len(exc) > 0 {
+		t["exclude"] = exc
+	}
+	if cmd.String("group") != "" {
+		t["group"] = true
+	}
+	if p := cmd.Int("temporal-period"); p != 0 {
+		t["temporal_period"] = p
+	}
+	if cmd.String("team-map") != "" {
+		t["team_map"] = true
+	}
+	if len(t) == 0 {
+		return nil
+	}
+	return t
+}
+
 // truncate caps res to its first n rows after the analysis's own sort, setting
 // the truncation metadata (row_count, total_count, truncated) so an agent can
 // tell a capped result from a complete one. n <= 0 means "all rows" and a cap
-// at or beyond the row count is a no-op.
+// at or beyond the row count is a no-op. It operates on res.Payload: a non-slice
+// payload (a future tree or graph) has RowLen 0 and is left alone.
 func truncate(res *output.Result, n int) {
 	if n <= 0 {
 		return
 	}
-	total := output.RowLen(res.Rows)
+	total := output.RowLen(res.Payload)
 	if total == 0 || n >= total {
 		return
 	}
-	res.Rows = reflect.ValueOf(res.Rows).Slice(0, n).Interface()
+	res.Payload = reflect.ValueOf(res.Payload).Slice(0, n).Interface()
 	res.RowCount = n
 	res.TotalCount = total
 	res.Truncated = true
