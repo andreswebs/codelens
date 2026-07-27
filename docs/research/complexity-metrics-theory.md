@@ -1,6 +1,6 @@
 # Source-Code Complexity Metrics: A Theory and Evidence Report
 
-Scope: every meaningful *code* complexity metric (structural, textual,
+Scope: every meaningful _code_ complexity metric (structural, textual,
 object-oriented, and readability/cognitive-load), with origin, exact
 computation, distinctive signal, weaknesses, and empirical evidence on
 defect/maintenance prediction, including the recurring critique that most
@@ -9,11 +9,11 @@ language-agnostic git-history tool.
 
 ## 1. Cyclomatic Complexity (McCabe)
 
-**Origin.** Thomas J. McCabe Sr., "A Complexity Measure," *IEEE Transactions on
-Software Engineering* SE-2(4), Dec 1976. Original paper:
+**Origin.** Thomas J. McCabe Sr., "A Complexity Measure," _IEEE Transactions on
+Software Engineering_ SE-2(4), Dec 1976. Original paper:
 [literateprogramming.com/mccabe.pdf](http://literateprogramming.com/mccabe.pdf).
 
-**What it measures.** The number of *linearly independent paths* through a
+**What it measures.** The number of _linearly independent paths_ through a
 function, computed from its control-flow graph (CFG). It is graph-theoretic: the
 cyclomatic number (a Betti number) of the CFG.
 
@@ -33,19 +33,18 @@ coverage. NIST later recommended a max of 10 per function.
 
 **Weaknesses / criticisms.**
 
-- Does *not* account for nesting depth: a flat sequence of 10 `if`s scores the
+- Does _not_ account for nesting depth: a flat sequence of 10 `if`s scores the
   same as 10 deeply nested ones, though the latter is far harder to understand.
   ([Cyclomatic complexity: the nesting problem](https://www.researchgate.net/publication/261455470_Cyclomatic_complexity_The_nesting_problem))
 - Treats each `switch`/`case` as a decision, over-penalizing readable multi-way
   branching.
-- Can *increase* when good structuring rules are applied (Evangelist's
+- Can _increase_ when good structuring rules are applied (Evangelist's
   observation, via Shepperd).
 - Not actionable / hard to interpret; high values do not reliably mean low
   readability.
 
 **Empirical evidence.** Martin Shepperd's foundational critique
-([A critique of cyclomatic complexity as a software metric](https://www.cs.du.edu/~snarayan/sada/teaching/COMP3705/lecture/p1/cycl-1.pdf),
-1988) argued v(G) "may well be no more than a proxy" for LOC and that its ability
+([A critique of cyclomatic complexity as a software metric](https://www.cs.du.edu/~snarayan/sada/teaching/COMP3705/lecture/p1/cycl-1.pdf), 1988) argued v(G) "may well be no more than a proxy" for LOC and that its ability
 to predict error rates/effort is "quite erratic." The strongest positive result
 he cites is Henry et al.'s UNIX study (165 procedures) showing strong
 CC-vs-error correlation. Later work found CC and executable LOC correlated at
@@ -55,7 +54,7 @@ A controlled experiment found ELOC, Halstead Volume, and CC mutually correlated
 at mean 0.904, and that all metrics together explained only 27.6% of defect-rate
 variance ([Study on Correlations Between Program Metrics and Defect Rate](https://scialert.net/fulltext/?doi=jse.2013.114.120)).
 A large-scale reassessment on 17.6M Java methods / 6.3M C functions found the
-CC-SLOC linear correlation is only *moderate* once variance is accounted for,
+CC-SLOC linear correlation is only _moderate_ once variance is accounted for,
 complicating the simple redundancy narrative
 ([Landman et al., "CC and LOC: Empirical Evidence of a Stable Linear Relationship"](https://www.researchgate.net/publication/220204439_Cyclomatic_Complexity_and_Lines_of_Code_Empirical_Evidence_of_a_Stable_Linear_Relationship)).
 
@@ -73,7 +72,7 @@ current rev. 2023). PDF:
 Blog:
 [Cognitive Complexity, Because Testability != Understandability](https://www.sonarsource.com/blog/cognitive-complexity-because-testability-understandability/).
 
-**Purpose.** Explicitly built to measure *understandability/maintainability*
+**Purpose.** Explicitly built to measure _understandability/maintainability_
 rather than testability, remedying CC's shortcomings. It breaks from a pure
 mathematical model in favor of a human-assessment-driven scheme.
 
@@ -89,9 +88,9 @@ mathematical model in favor of a human-assessment-driven scheme.
 to the score):
 
 - **Structural** - control-flow structures subject to nesting increment.
-- **Fundamental** - statements *not* subject to nesting increment.
+- **Fundamental** - statements _not_ subject to nesting increment.
 - **Hybrid** - control-flow structures not subject to nesting increment but which
-  *do* raise the nesting level.
+  _do_ raise the nesting level.
 - **Nesting** - the per-level surcharge.
 
 **Exact increment rules.**
@@ -103,11 +102,11 @@ to the score):
   children):** `else if`, `else`, `elif` (the mental cost of the condition was
   already paid at the `if`).
 - **Fundamental increment (+1, no nesting surcharge):** `goto`/`break`/`continue`
-  to a *label*; each **sequence of like binary boolean operators**; recursion.
+  to a _label_; each **sequence of like binary boolean operators**; recursion.
 - **Nesting level is incremented by:** loops (`for`/`while`/`do`), conditionals
   (`if`, ternary), `switch`, `catch`, and nested function/lambda definitions.
 
-**Boolean operator sequences (precise rule).** Cognitive Complexity does *not*
+**Boolean operator sequences (precise rule).** Cognitive Complexity does _not_
 increment per `&&`/`||`. It adds +1 for each **new sequence of like operators**;
 switching operator type starts a new sequence. Worked example from the
 whitepaper:
@@ -148,7 +147,7 @@ structural proxy, not validated ground truth.
 **Empirical evidence.** Munoz Baron, Wyrich and Wagner, "An Empirical Validation
 of Cognitive Complexity as a Measure of Source Code Understandability," ESEM 2020
 ([arXiv:2007.12520](https://arxiv.org/pdf/2007.12520)) pooled data from published
-understandability studies and found *moderate but statistically significant*
+understandability studies and found _moderate but statistically significant_
 correlations with comprehension time and subjective ratings, the first metric
 with such validation. However, Lavazza et al. (JSS 2022,
 [ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S0164121222002370))
@@ -158,7 +157,7 @@ not appear to fulfill the promise of being a significant improvement."
 
 ## 3. Halstead Complexity Suite
 
-**Origin.** Maurice H. Halstead, *Elements of Software Science*, 1977. Reference:
+**Origin.** Maurice H. Halstead, _Elements of Software Science_, 1977. Reference:
 [Halstead complexity measures (Wikipedia)](https://en.wikipedia.org/wiki/Halstead_complexity_measures);
 [Verifysoft Halstead Metrics](https://www.verifysoft.com/en_halstead_metrics.html).
 
@@ -179,8 +178,8 @@ not appear to fulfill the promise of being a significant improvement."
 - Time to program: `T = E / 18` seconds (Stroud number S = 18)
 - Delivered bugs: `B = V / 3000`
 
-**What it captures that others miss.** Focuses on *vocabulary/information
-content* rather than control flow; less sensitive to layout than LOC; captures
+**What it captures that others miss.** Focuses on _vocabulary/information
+content_ rather than control flow; less sensitive to layout than LOC; captures
 operand/operator density.
 
 **Weaknesses / criticisms.**
@@ -196,11 +195,11 @@ operand/operator density.
 - Very low practitioner adoption vs LOC/CC.
 
 **Empirical evidence.** Mixed. A controlled study found Halstead E, CC, and
-length all correlated with modification accuracy/time, but *primarily in
-unstructured, uncommented code and for less-experienced programmers*
+length all correlated with modification accuracy/time, but _primarily in
+unstructured, uncommented code and for less-experienced programmers_
 ([Measuring the Psychological Complexity of Software Maintenance Tasks](https://ieeexplore.ieee.org/document/1702603/)).
 A recent study found Halstead Effort/Difficulty correlate with cognitive load
-*better* than cyclomatic or cognitive complexity, positioning it as a useful
+_better_ than cyclomatic or cognitive complexity, positioning it as a useful
 complement. Decomposed Halstead metrics have shown value in fault prediction
 ([PeerJ, decomposed Halstead in fault prediction](https://peerj.com/articles/cs-1647/)).
 The controlled-experiment study above found only Halstead Volume (with nesting
@@ -265,13 +264,13 @@ between variants
 ## 5. NPATH Complexity
 
 **Origin.** Brian A. Nejmeh, "NPATH: A measure of execution path complexity and
-its applications," *Communications of the ACM* 31(2):188 to 200, 1988.
+its applications," _Communications of the ACM_ 31(2):188 to 200, 1988.
 [ACM DL](https://dl.acm.org/doi/10.1145/42372.42379).
 
-**What it measures.** The number of *acyclic execution paths* through a function,
+**What it measures.** The number of _acyclic execution paths_ through a function,
 explicitly designed to fix CC's blindness to nesting. Unlike CC (which keeps
 loops and counts basic paths), NPATH eliminates loops and counts distinct acyclic
-paths, so it grows *multiplicatively* with nesting rather than additively.
+paths, so it grows _multiplicatively_ with nesting rather than additively.
 
 **Algorithm (per-construct expressions, composed multiplicatively for
 sequences):**
@@ -301,11 +300,11 @@ exercise) rather than a validated defect predictor.
 ## 6. Nesting Depth / Maximum Indentation
 
 **Origin.** Not attributable to a single paper; formalized in various nesting
-studies, e.g., Alrasheed et al., "Measuring nesting," *IET Software* 2022
+studies, e.g., Alrasheed et al., "Measuring nesting," _IET Software_ 2022
 ([Wiley](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/sfw2.12069)).
 
 **What it measures.** Maximum (or average) depth of encapsulated scopes/blocks in
-a function body, "how deeply nested" branches are, orthogonal to *how many*
+a function body, "how deeply nested" branches are, orthogonal to _how many_
 branches (CC's territory).
 
 **Computation.** Track block/brace/indentation depth during a single pass; record
@@ -326,11 +325,11 @@ a distinct feature in defect-prediction models (max nesting depth) alongside CC
 ## 7. ABC Metric
 
 **Origin.** Jerry Fitzpatrick, "Applying the ABC Metric to C, C++, and Java,"
-*C++ Report*, June 1997.
+_C++ Report_, June 1997.
 [PDF](https://www.win.tue.nl/~wstomv/edu/2ip30/references/ABCmetric.pdf);
 [Wikipedia](https://en.wikipedia.org/wiki/ABC_Software_Metric).
 
-**What it measures.** *Size* (explicitly not complexity), as a triplet counting:
+**What it measures.** _Size_ (explicitly not complexity), as a triplet counting:
 
 - **A** = Assignments (data stored/transferred into a variable)
 - **B** = Branches (explicit forward branch out of scope, in practice function
@@ -350,7 +349,7 @@ no validated defect thresholds.
 ## 8. Information Flow / Fan-in and Fan-out (Henry-Kafura)
 
 **Origin.** Sallie Henry and Dennis Kafura, "Software Structure Metrics Based on
-Information Flow," *IEEE TSE* SE-7(5):510 to 518, Sept 1981.
+Information Flow," _IEEE TSE_ SE-7(5):510 to 518, Sept 1981.
 [Text mirror](https://masters.donntu.ru/2020/fknt/mazalov/library/article04/).
 
 **What it measures.** Structural complexity from a procedure's connectivity to its
@@ -358,9 +357,9 @@ environment (information flow through parameters, globals, data structures).
 
 **Definitions.**
 
-- **fan-in** = number of local flows *into* the procedure + number of data
+- **fan-in** = number of local flows _into_ the procedure + number of data
   structures it reads.
-- **fan-out** = number of local flows *out* + number of data structures it
+- **fan-out** = number of local flows _out_ + number of data structures it
   updates.
 
 **Formula.**
@@ -375,7 +374,7 @@ is super-linear in connections (same power-of-2 rationale as Brooks' law and
 Belady's partitioning formula). Some later sources drop `length` or drop the
 square; the canonical 1981 form is `length * (fan-in * fan-out)^2`.
 
-**What it captures that others miss.** *Inter-module* coupling / architectural
+**What it captures that others miss.** _Inter-module_ coupling / architectural
 complexity, invisible to intra-function metrics like CC or Halstead.
 
 **Weaknesses.** Zero fan-in or fan-out zeroes the whole metric; hard to compute
@@ -389,30 +388,30 @@ maintenance-data validation.
 ## 9. Object-Oriented Metrics (Chidamber-Kemerer suite)
 
 **Origin.** S. Chidamber and C. Kemerer, "A Metrics Suite for Object-Oriented
-Design," *IEEE TSE* 20(6), 1994 (from the 1991 MIT Sloan "Towards a Metrics Suite
+Design," _IEEE TSE_ 20(6), 1994 (from the 1991 MIT Sloan "Towards a Metrics Suite
 for OO Design").
 [Suite PDF](https://people.scs.carleton.ca/~jeanpier/sharedF14/T1/extra%20stuff/about%20metrics/Chidamber%20&%20Kemerer%20object-oriented%20metrics%20suite.pdf);
 [Virtual Machinery Sidebar 3](http://www.virtualmachinery.com/sidebar3.htm).
 
-| Metric | Definition | Computation |
-|---|---|---|
-| **WMC** (Weighted Methods per Class) | Sum of complexities of a class's methods | Often simplified to method count; or sum of per-method CC |
-| **DIT** (Depth of Inheritance Tree) | Longest inheritance path to the class root | Max ancestor chain length |
-| **NOC** (Number of Children) | Immediate subclasses | Count direct subclasses |
-| **CBO** (Coupling Between Objects) | Number of other classes this class is coupled to (calls/instantiates/uses) | Count distinct referenced classes |
-| **RFC** (Response For a Class) | Methods potentially executed in response to a message | Local methods + distinct methods they call |
-| **LCOM** (Lack of Cohesion of Methods) | Cohesion deficit among methods (see section 10) | Method-pairs not sharing attributes minus pairs that do |
+| Metric                                 | Definition                                                                 | Computation                                               |
+| -------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **WMC** (Weighted Methods per Class)   | Sum of complexities of a class's methods                                   | Often simplified to method count; or sum of per-method CC |
+| **DIT** (Depth of Inheritance Tree)    | Longest inheritance path to the class root                                 | Max ancestor chain length                                 |
+| **NOC** (Number of Children)           | Immediate subclasses                                                       | Count direct subclasses                                   |
+| **CBO** (Coupling Between Objects)     | Number of other classes this class is coupled to (calls/instantiates/uses) | Count distinct referenced classes                         |
+| **RFC** (Response For a Class)         | Methods potentially executed in response to a message                      | Local methods + distinct methods they call                |
+| **LCOM** (Lack of Cohesion of Methods) | Cohesion deficit among methods (see section 10)                            | Method-pairs not sharing attributes minus pairs that do   |
 
 **What they capture that others miss.** Design-level complexity (inheritance,
 coupling, cohesion) that procedural metrics cannot express.
 
 **Weaknesses / criticisms.** WMC conflates "many methods" with "complex methods";
-DIT/NOC ambiguous (deep inheritance = reuse *or* fragility); measurement-theory
+DIT/NOC ambiguous (deep inheritance = reuse _or_ fragility); measurement-theory
 critiques argue CBO/LCOM lack a sound empirical relation system
 ([C&K measurement-theory perspective](https://www.researchgate.net/publication/3187794)).
 
 **Empirical evidence.** Basili, Briand and Melo, "A Validation of Object-Oriented
-Design Metrics as Quality Indicators," *IEEE TSE* 22(10), 1996: CBO, WMC, RFC,
+Design Metrics as Quality Indicators," _IEEE TSE_ 22(10), 1996: CBO, WMC, RFC,
 DIT, NOC significantly predicted fault-proneness in student C++ projects; LCOM did
 not. A NASA study found higher CBO/WMC meant lower quality. This is one of the
 better-validated metric families for defect prediction (though confounded, again,
@@ -424,13 +423,13 @@ Reference:
 [NDepend, Lack of Cohesion of Methods](https://blog.ndepend.com/lack-of-cohesion-methods/);
 [Aivosto cohesion metrics](https://www.aivosto.com/project/help/pm-oo-cohesion.html).
 
-| Variant | Author(s) | Formula / definition |
-|---|---|---|
-| **LCOM1** | Chidamber and Kemerer 1991 | Number of method pairs sharing **no** attribute. (Zero for very different classes, a flaw.) |
-| **LCOM2** | Chidamber and Kemerer 1994 | `max(0, P - Q)` where P = pairs not sharing attributes, Q = pairs that share at least one. |
-| **LCOM3** | Li and Henry 1993 | Number of **connected components** in the graph where nodes = methods, edges = shared instance attribute. |
-| **LCOM4** | Hitz and Montazeri | Connected components where edges = shared field **or** one method calls the other. LCOM4 = 1 is cohesive; 2 or more suggests splitting. (Recommended variant; accounts for accessors/calls.) |
-| **LCOM HS** (LCOM5) | Henderson-Sellers | `(M - (sum mf)/F) / (M - 1)`, where M = methods, F = fields, sum mf = sum over fields of number of methods accessing that field. Range 0 to 2; 0 = perfect cohesion. |
+| Variant             | Author(s)                  | Formula / definition                                                                                                                                                                         |
+| ------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **LCOM1**           | Chidamber and Kemerer 1991 | Number of method pairs sharing **no** attribute. (Zero for very different classes, a flaw.)                                                                                                  |
+| **LCOM2**           | Chidamber and Kemerer 1994 | `max(0, P - Q)` where P = pairs not sharing attributes, Q = pairs that share at least one.                                                                                                   |
+| **LCOM3**           | Li and Henry 1993          | Number of **connected components** in the graph where nodes = methods, edges = shared instance attribute.                                                                                    |
+| **LCOM4**           | Hitz and Montazeri         | Connected components where edges = shared field **or** one method calls the other. LCOM4 = 1 is cohesive; 2 or more suggests splitting. (Recommended variant; accounts for accessors/calls.) |
+| **LCOM HS** (LCOM5) | Henderson-Sellers          | `(M - (sum mf)/F) / (M - 1)`, where M = methods, F = fields, sum mf = sum over fields of number of methods accessing that field. Range 0 to 2; 0 = perfect cohesion.                         |
 
 **Signal:** LCOM4 (connected components) is the most interpretable, it literally
 tells you into how many independent classes a class could be split.
@@ -480,7 +479,7 @@ Shannon entropy over the distribution of indentation levels. No parser required,
 works on multi-language diffs.
 
 **What it captures that others miss.** Language-agnostic complexity ranking of
-*revisions/diffs* where parsers fail or code mixes languages. The companion SCAM
+_revisions/diffs_ where parsers fail or code mixes languages. The companion SCAM
 2008 paper "From indentation shapes to code structures" maps indentation shapes
 (flat / slash / bubble) to syntactic structure.
 
@@ -497,7 +496,7 @@ outperformed Buse-Weimer.
 ### 13a. Buse-Weimer Readability
 
 **Origin.** Raymond P.L. Buse and Westley R. Weimer, "Learning a Metric for Code
-Readability," *IEEE TSE* 36(4):546 to 558, 2010.
+Readability," _IEEE TSE_ 36(4):546 to 558, 2010.
 [Preprint](https://web.eecs.umich.edu/~weimerw/p/weimer-tse2010-readability-preprint.pdf).
 
 **What it measures.** A machine-learned binary classifier of "readable/not" from
@@ -530,7 +529,7 @@ number of concepts) on top of structural features, arguing code is a form of
 natural-language text. Outputs a 0 to 1 readability score; distributed as a CLI
 tool.
 
-**Results.** Textual features *complement* structural ones; the combined model
+**Results.** Textual features _complement_ structural ones; the combined model
 beats all prior state-of-the-art (validated on 600+ snippets rated by 5000+
 people). Top textual features: comments readability, textual coherence, number of
 concepts.
@@ -552,7 +551,7 @@ strongly with size (LOC), so their incremental predictive power is small.**
   explain only around 28% of defect variance; only Halstead Volume, **nesting
   depth**, and number of procedures show even around 0.3 defect correlation
   ([scialert](https://scialert.net/fulltext/?doi=jse.2013.114.120)).
-- Landman et al.: at very large scale, CC-SLOC correlation is only *moderate*, and
+- Landman et al.: at very large scale, CC-SLOC correlation is only _moderate_, and
   improves with aggregation + power transforms, so "redundancy" is overstated but
   real.
 - OO metrics (Basili 1996) predict faults but are also size-confounded.
@@ -567,14 +566,14 @@ strongly with size (LOC), so their incremental predictive power is small.**
 1. **Lines of code (LLOC/SLOC)**, the baseline every study confirms as a strong
    (if crude) defect/effort correlate; the yardstick others must beat.
 2. **Nesting depth (max/avg)**, repeatedly one of the few signals with defect
-   correlation *beyond* LOC; cheap; captures what CC misses.
+   correlation _beyond_ LOC; cheap; captures what CC misses.
 3. **Cognitive Complexity**, the only structural metric explicitly validated
    (moderately) against human understandability; strong tooling ecosystem;
    rewards decomposition.
 4. **Halstead Volume / Effort**, decomposed variants show fault-prediction value
    and the best correlation with measured cognitive load in recent work.
 5. **Buse-Weimer / Posnett readability (size + complexity + entropy)**, the only
-   metrics tied to defects *through* human readability; the 3-feature form is
+   metrics tied to defects _through_ human readability; the 3-feature form is
    compact.
 6. **CK OO suite (CBO, WMC, RFC)**, best-validated design-level fault predictors
    (Basili 1996), for OO codebases.
@@ -590,7 +589,7 @@ strongly with size (LOC), so their incremental predictive power is small.**
    (LLOC needs light per-language statement rules).
 2. **Indentation moments + indentation entropy (Hindle)**, purpose-built for
    language-agnostic, diff-friendly complexity ranking; proven to proxy
-   McCabe/Halstead using *only whitespace*. **Top pick for a tool that must avoid
+   McCabe/Halstead using _only whitespace_. **Top pick for a tool that must avoid
    per-language parsers.**
 3. **Nesting depth via indentation/brace tracking**, approximable from
    indentation alone; strong orthogonal signal.
@@ -598,7 +597,7 @@ strongly with size (LOC), so their incremental predictive power is small.**
    language-agnostic-ish.
 5. **ABC / decision-keyword counts**, a keyword-regex approximation of CC/ABC is
    feasible without a full parser, at some accuracy cost.
-6. **Halstead**, needs per-language operator/operand classification; *moderately*
+6. **Halstead**, needs per-language operator/operand classification; _moderately_
    portable but tokenizer-sensitive.
 7. **Cognitive and Cyclomatic Complexity**, need a real AST/CFG per language
    (accurate parsers), so least practical for a strictly language-agnostic

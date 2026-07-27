@@ -29,18 +29,18 @@ linter.
 
 The factors, grouped as CodeScene documents them:
 
-| Category | Factors |
-|---|---|
-| **Module / class smells** | Low Cohesion (LCOM4), Brain Class / God Class, Developer Congestion (many devs concurrently), Complex Code by Former Contributors (knowledge loss) |
-| **Function smells** | Brain Method / God Function, Complex Method (cyclomatic complexity), Large Method, DRY Violations (duplication that actually co-changes), Primitive Obsession |
+| Category                  | Factors                                                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Module / class smells** | Low Cohesion (LCOM4), Brain Class / God Class, Developer Congestion (many devs concurrently), Complex Code by Former Contributors (knowledge loss)                                                                         |
+| **Function smells**       | Brain Method / God Function, Complex Method (cyclomatic complexity), Large Method, DRY Violations (duplication that actually co-changes), Primitive Obsession                                                              |
 | **Implementation smells** | Nested Complexity (ifs inside ifs/loops), Bumpy Road (multiple un-encapsulated logic chunks in one function), Complex Conditional (multi-operator AND/OR expressions), Large Assertion Blocks, Duplicated Assertion Blocks |
 
 Configurable thresholds are exposed as knobs like
 `function_cyclomatic_complexity_warning` and `function_nesting_depth_warning`.
 
-**How complexity fuses with churn to prioritize.** Code Health measures *what the
-code looks like*. It is layered on top of **Hotspots**, which measure *how you
-work with the code*: by default the hotspot criterion is **commit frequency
+**How complexity fuses with churn to prioritize.** Code Health measures _what the
+code looks like_. It is layered on top of **Hotspots**, which measure _how you
+work with the code_: by default the hotspot criterion is **commit frequency
 (change frequency) of a file**. The product view CodeScene calls **Technical Debt
 Friction** intersects the two: low Code Health x high development activity = the
 files where poor quality actively slows the team, i.e. where refactoring pays off.
@@ -48,8 +48,8 @@ Debt in cold code is explicitly treated as "may be wasteful to fix."
 
 At function/method granularity this is **X-Ray**, which within a hot file computes
 per-method cyclomatic complexity, **change coupling between methods** (e.g. "these
-two methods change together 42% of the time"), copy-paste detection *prioritized
-by change coupling* (clones that actually co-change), and a **Complexity Trend**
+two methods change together 42% of the time"), copy-paste detection _prioritized
+by change coupling_ (clones that actually co-change), and a **Complexity Trend**
 over time (is this method being refactored, or still degrading?).
 
 - [Code Health docs (6.0.19)](https://docs.enterprise.codescene.io/versions/6.0.19/guides/technical/code-health.html)
@@ -73,14 +73,14 @@ or more when applied to unhealthy code**.
 
 ## 2. How mainstream tools measure and threshold complexity
 
-| Tool | Primary complexity metric | Default / recommended threshold | Notes |
-|---|---|---|---|
-| **SonarQube** | **Cognitive Complexity** (its own invention) is the flagship; Cyclomatic Complexity still reported | **15** per function (rule level); cyclomatic often warned above 20 at file level | Cognitive penalizes nesting, break-in-flow, recursion; cyclomatic treats a 10-branch switch = 10 nested ifs. Best practice: enforce cognitive at method level via quality-profile **rules** (tag `brain-overload`), not as a project-wide quality-gate **measure**. Default "Sonar way" gate targets *new code* (80%+ coverage, 3% or less dup, A ratings) and does not gate complexity directly. |
-| **Code Climate / Qlty** | **Cognitive Complexity** (their "Complexity" = cognitive) | file "complex" over configurable threshold; remediation time in minutes rolls into tech-debt | Surfaces churn alongside complexity/duplication/coverage. Converts smells to remediation minutes to tech-debt. |
-| **PMD** | **Cyclomatic Complexity** | **method 10, class 80**; NPATH 200 | Bands: 1 to 4 low, 5 to 7 moderate, 8 to 10 high, 11+ very high. |
-| **Checkstyle** | **Cyclomatic Complexity** (methods/ctors/initializers only) | **10** (also offers NPATH=200) | Guidance: 10 is an aspirational target, keep below 20. |
-| **Codacy** | **Cyclomatic Complexity** | configurable "file is complex when over"; PR complexity sums file deltas where delta 4 or more | Rolls complexity + duplication + coverage + issues into a repo/file **grade**. |
-| **CodeFactor** | Issue density (incl. a "code complexity" issue class) | **A-F grade**, no published formula | Grade = weighted issue-to-size ratio, **weighted by file change frequency/importance** (churn-weighted). VS Code: 686 issues / 3,133 files still = A. |
+| Tool                    | Primary complexity metric                                                                          | Default / recommended threshold                                                                | Notes                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SonarQube**           | **Cognitive Complexity** (its own invention) is the flagship; Cyclomatic Complexity still reported | **15** per function (rule level); cyclomatic often warned above 20 at file level               | Cognitive penalizes nesting, break-in-flow, recursion; cyclomatic treats a 10-branch switch = 10 nested ifs. Best practice: enforce cognitive at method level via quality-profile **rules** (tag `brain-overload`), not as a project-wide quality-gate **measure**. Default "Sonar way" gate targets _new code_ (80%+ coverage, 3% or less dup, A ratings) and does not gate complexity directly. |
+| **Code Climate / Qlty** | **Cognitive Complexity** (their "Complexity" = cognitive)                                          | file "complex" over configurable threshold; remediation time in minutes rolls into tech-debt   | Surfaces churn alongside complexity/duplication/coverage. Converts smells to remediation minutes to tech-debt.                                                                                                                                                                                                                                                                                    |
+| **PMD**                 | **Cyclomatic Complexity**                                                                          | **method 10, class 80**; NPATH 200                                                             | Bands: 1 to 4 low, 5 to 7 moderate, 8 to 10 high, 11+ very high.                                                                                                                                                                                                                                                                                                                                  |
+| **Checkstyle**          | **Cyclomatic Complexity** (methods/ctors/initializers only)                                        | **10** (also offers NPATH=200)                                                                 | Guidance: 10 is an aspirational target, keep below 20.                                                                                                                                                                                                                                                                                                                                            |
+| **Codacy**              | **Cyclomatic Complexity**                                                                          | configurable "file is complex when over"; PR complexity sums file deltas where delta 4 or more | Rolls complexity + duplication + coverage + issues into a repo/file **grade**.                                                                                                                                                                                                                                                                                                                    |
+| **CodeFactor**          | Issue density (incl. a "code complexity" issue class)                                              | **A-F grade**, no published formula                                                            | Grade = weighted issue-to-size ratio, **weighted by file change frequency/importance** (churn-weighted). VS Code: 686 issues / 3,133 files still = A.                                                                                                                                                                                                                                             |
 
 The market split is clean: **IDE/linter-lineage tools (PMD, Checkstyle, Codacy)
 center on cyclomatic complexity; the "code quality platform" generation
@@ -124,7 +124,7 @@ metric for quality issues" (multiple studies cited by CodeScene); (2) complexity
 alone correlates with defects but weakly once size is controlled; (3) the
 intersection concentrates defects/cost far above either marginal (Code Red's 15x
 defect and 124% time gaps are measured on Code Health, which is complexity-composed
-but reported at file granularity and *prioritized* by hotspots). The honest caveat:
+but reported at file granularity and _prioritized_ by hotspots). The honest caveat:
 rigorous head-to-head "hotspot (fused) vs churn-only" defect-prediction ablations
 are thin, and the strongest behavioral-vs-structural comparisons (Section 4)
 actually favor process metrics on their own.
@@ -139,7 +139,7 @@ This is the most important section for a behavioral tool and the case is strong.
 **Rahman and Devanbu (ICSE 2013), "How, and Why, Process Metrics Are Better."**
 Process metrics (churn, commits, developer count, prior changes) outperform
 product/code metrics (complexity, LOC, OO metrics) for defect prediction. The
-*why* is the load-bearing insight:
+_why_ is the load-bearing insight:
 
 1. **Stagnation.** Code metrics are largely **static across releases** while the
    code churns; they do not move, so they cannot track where risk migrates.
@@ -147,8 +147,8 @@ product/code metrics (complexity, LOC, OO metrics) for defect prediction. The
 2. **Collinearity/redundancy.** Code metrics are **highly correlated with each
    other** (and with LOC), so a bag of complexity metrics carries little
    independent signal.
-3. Bottom line: *defect-proneness tracks how code evolves more than what it looks
-   like at a snapshot.*
+3. Bottom line: _defect-proneness tracks how code evolves more than what it looks
+   like at a snapshot._
 
 - [Rahman and Devanbu 2013 (draft PDF)](https://research.cs.queensu.ca/home/ahmed/home/teaching/CISC880/F17/papers/HowAndWhyProcessMetricsAreBetter.pdf)
 
@@ -185,17 +185,17 @@ LOC?**
 
 - **Redundant with LOC:** raw cyclomatic complexity and most volume-ish complexity
   metrics are strongly collinear with LOC. Once you have file size and churn, they
-  add little for *defect prediction*. The within-NLOC-band AUC around 0.49 is the
+  add little for _defect prediction_. The within-NLOC-band AUC around 0.49 is the
   cleanest single data point.
 - **Adds signal:** (a) **cognitive/nesting-shaped** metrics (cognitive complexity,
-  nested complexity, bumpy road) capture *comprehension* difficulty that LOC
-  misses, and better predict *maintenance effort / time-in-development* than defect
+  nested complexity, bumpy road) capture _comprehension_ difficulty that LOC
+  misses, and better predict _maintenance effort / time-in-development_ than defect
   counts; (b) complexity is **actionable/localizing** in a way churn is not: churn
-  tells you *where* to look, complexity tells you *what to fix* at method
+  tells you _where_ to look, complexity tells you _what to fix_ at method
   granularity; (c) **compound** signals (Brain Method = LOC + complexity + nesting
   - centrality) beat any single primitive; (d) **complexity trend** (rising over
-  time) is a process-flavored use of a structural metric and is more informative
-  than a static snapshot.
+    time) is a process-flavored use of a structural metric and is more informative
+    than a static snapshot.
 
 The synthesis the literature supports: **for predicting defects, behavioral/process
 metrics dominate and static complexity is mostly redundant with size; for
@@ -237,22 +237,22 @@ comprehension-oriented complexity earns its keep.** Those are different jobs.
 - **Change-coupling-informed complexity / architectural debt.** "Technical Debt
   Friction" (2026) argues change coupling captures only one source of maintenance
   difficulty and proposes a finer-grained activity-x-maintainability signal.
-  Cai/Kazman ATD patterns quantify and *predict future maintenance cost* of
+  Cai/Kazman ATD patterns quantify and _predict future maintenance cost_ of
   architectural debt.
   - [Technical Debt Friction (arXiv 2607.01850)](https://arxiv.org/pdf/2607.01850)
 
 ## (a) Which tool uses which complexity metric as primary
 
-| Tool | Primary complexity metric | Fuses with behavioral data? |
-|---|---|---|
-| **CodeScene** | Compound code smells (Brain Method etc.) built from cyclomatic + nesting + centrality + LOC, to Code Health 1-10 | **Yes**, hotspots (change freq), change coupling, ownership, complexity trend; this is its core |
-| **SonarQube** | **Cognitive Complexity** (cyclomatic secondary) | No (static/PR-scoped; no git-history mining) |
-| **Code Climate / Qlty** | **Cognitive Complexity** | Partial, reports churn alongside, but scoring is static |
-| **PMD** | **Cyclomatic Complexity** (method 10 / class 80) | No |
-| **Checkstyle** | **Cyclomatic Complexity** (10; NPATH 200) | No |
-| **Codacy** | **Cyclomatic Complexity**, to repo grade | No |
-| **CodeFactor** | Issue density incl. complexity, to A-F grade | Partial, grade weighted by **file change frequency** |
-| **repowise** | **25 deterministic markers** (McCabe, brain methods, LCOM4, clones) + git behavior, weights learned from defects | **Yes**, churn, entropy, ownership, co-change, prior defects, hotspots |
+| Tool                    | Primary complexity metric                                                                                        | Fuses with behavioral data?                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **CodeScene**           | Compound code smells (Brain Method etc.) built from cyclomatic + nesting + centrality + LOC, to Code Health 1-10 | **Yes**, hotspots (change freq), change coupling, ownership, complexity trend; this is its core |
+| **SonarQube**           | **Cognitive Complexity** (cyclomatic secondary)                                                                  | No (static/PR-scoped; no git-history mining)                                                    |
+| **Code Climate / Qlty** | **Cognitive Complexity**                                                                                         | Partial, reports churn alongside, but scoring is static                                         |
+| **PMD**                 | **Cyclomatic Complexity** (method 10 / class 80)                                                                 | No                                                                                              |
+| **Checkstyle**          | **Cyclomatic Complexity** (10; NPATH 200)                                                                        | No                                                                                              |
+| **Codacy**              | **Cyclomatic Complexity**, to repo grade                                                                         | No                                                                                              |
+| **CodeFactor**          | Issue density incl. complexity, to A-F grade                                                                     | Partial, grade weighted by **file change frequency**                                            |
+| **repowise**            | **25 deterministic markers** (McCabe, brain methods, LCOM4, clones) + git behavior, weights learned from defects | **Yes**, churn, entropy, ownership, co-change, prior defects, hotspots                          |
 
 Pattern: **cyclomatic** = the linter generation; **cognitive** = the platform
 generation; **compound + behavioral** = CodeScene and repowise, the two tools
@@ -263,8 +263,8 @@ whose primary claim is defect/effort prediction rather than style enforcement.
 **Worth adding when:**
 
 1. **The job is prioritization + remediation guidance, not just defect
-   prediction.** Churn/hotspots localize *where*; complexity (especially at
-   function level) tells you *what to fix*. codelens already mines
+   prediction.** Churn/hotspots localize _where_; complexity (especially at
+   function level) tells you _what to fix_. codelens already mines
    coupling/hotspots/ownership; complexity is the missing "what to fix" half.
 2. **You use comprehension-shaped complexity, not volume-shaped.** Cognitive
    complexity, nesting depth, and "bumpy road" add signal beyond LOC; raw
@@ -272,8 +272,8 @@ whose primary claim is defect/effort prediction rather than style enforcement.
 3. **You make it compound and behavior-gated.** The CodeScene lesson: a Brain
    Method (LOC + complexity + nesting + centrality) inside a hotspot is far more
    informative than any single metric anywhere. Complexity earns its place as an
-   *intersection* with churn, not as a standalone leaderboard.
-4. **You track complexity *trend*, not snapshot.** Rising complexity in a hot file
+   _intersection_ with churn, not as a standalone leaderboard.
+4. **You track complexity _trend_, not snapshot.** Rising complexity in a hot file
    is a process signal (fights the stagnation critique) and predicts degradation.
 5. **You want an effort/comprehension proxy** (time-in-development, review load, AI
    -assistant safety), where Code Red-style evidence is strongest.
@@ -293,7 +293,7 @@ whose primary claim is defect/effort prediction rather than style enforcement.
 
 **Recommendation for codelens.** Add complexity as a **comprehension-oriented,
 function-level, compound signal that is intersected with existing behavioral
-outputs (hotspots, change coupling, ownership)** and surfaced as a *trend*, not as
+outputs (hotspots, change coupling, ownership)** and surfaced as a _trend_, not as
 a standalone defect predictor. Keep churn/ownership/coupling as the primary
 defect-risk backbone (the evidence favors them), and position complexity as the
 actionable "what and where to refactor" layer plus an effort/comprehension proxy.

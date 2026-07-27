@@ -67,20 +67,20 @@ band, complexity's residual predictive power is AUC around 0.49 (chance).
 So static complexity, added naively, risks shipping a dressed-up LOC ranker. But
 it earns its place for three different jobs:
 
-1. **Actionability.** Churn tells you *where* to look; complexity tells you *what
-   to fix*, at function granularity. codelens already has the "where" (hotspots,
+1. **Actionability.** Churn tells you _where_ to look; complexity tells you _what
+   to fix_, at function granularity. codelens already has the "where" (hotspots,
    coupling, ownership); complexity is the missing "what."
 2. **Comprehension / effort, not defects.** The Code Red study (39 codebases)
    shows low code health means around 15x more defects and around 124% longer
-   time-in-development; the evidence is strongest for complexity predicting *effort
-   and comprehension load*, which matters most for legacy navigation.
-3. **Trend, not snapshot.** Rising complexity in a hot file is a *process* signal
+   time-in-development; the evidence is strongest for complexity predicting _effort
+   and comprehension load_, which matters most for legacy navigation.
+3. **Trend, not snapshot.** Rising complexity in a hot file is a _process_ signal
    (it moves), which sidesteps the stagnation critique. CodeScene's whole
    "complexity trend" feature is this.
 
 CodeScene's design lesson: Code Health (1-10) is **compound and behavior-gated**.
 A "Brain Method" is not high cyclomatic alone; it is LOC + cyclomatic + nesting +
-centrality, and it only matters inside a hotspot. Complexity as an *intersection*
+centrality, and it only matters inside a hotspot. Complexity as an _intersection_
 with churn, never a standalone leaderboard.
 
 ## What this means for codelens: a layered path
@@ -95,7 +95,7 @@ Tagged by boundary-flex and effort.
   once, not once per commit. This decision unlocks everything below.
 - **Lane 1, indentation complexity + trend (recommended first cut).** Parser-free,
   universal, around 1 day, no CGO. Compute logical indentation per entity, and
-  crucially *over history* so you get the trend (rising, dipping, flat) paired with
+  crucially _over history_ so you get the trend (rising, dipping, flat) paired with
   LOC. Matches codelens's evolutionary identity and is a process-flavored use of a
   structural metric, which the evidence favors. Boundary flex: content-reading
   only.

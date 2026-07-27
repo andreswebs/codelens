@@ -30,10 +30,10 @@ version N C parsers.
 
 **Go bindings, three options:**
 
-| Binding | Maintainer | Grammars | Notes |
-|---|---|---|---|
-| [smacker/go-tree-sitter](https://github.com/smacker/go-tree-sitter) | community | many **bundled in-repo** (JS, Python, C/C++, Go, TS/TSX, Java, Ruby, etc.) | Long-established, MIT, `sitter.NewParser()` + `parser.ParseCtx(...)`. Distributed as a git snapshot rather than tagged releases. GC calls `Close()` for you. Easiest onboarding: one `go get`, grammars included. ([README](https://github.com/smacker/go-tree-sitter/blob/master/README.md), [pkg.go.dev](https://pkg.go.dev/github.com/smacker/go-tree-sitter)) |
-| [tree-sitter/go-tree-sitter](https://github.com/tree-sitter/go-tree-sitter) | official tree-sitter org | **none bundled**, each grammar is a separate `go get` (e.g. `tree-sitter/tree-sitter-javascript`), or load `.so` at runtime via purego | Newer, tracks upstream. API: `NewParser()`, `SetLanguage()`, `Parse(code, nil)`, `tree.RootNode()`, `root.ToSexp()`. **You must call `Close()`** on Parser/Tree/TreeCursor/Query/QueryCursor (CGO finalizer bug). More assembly required but cleaner long-term. |
+| Binding                                                                     | Maintainer               | Grammars                                                                                                                               | Notes                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [smacker/go-tree-sitter](https://github.com/smacker/go-tree-sitter)         | community                | many **bundled in-repo** (JS, Python, C/C++, Go, TS/TSX, Java, Ruby, etc.)                                                             | Long-established, MIT, `sitter.NewParser()` + `parser.ParseCtx(...)`. Distributed as a git snapshot rather than tagged releases. GC calls `Close()` for you. Easiest onboarding: one `go get`, grammars included. ([README](https://github.com/smacker/go-tree-sitter/blob/master/README.md), [pkg.go.dev](https://pkg.go.dev/github.com/smacker/go-tree-sitter)) |
+| [tree-sitter/go-tree-sitter](https://github.com/tree-sitter/go-tree-sitter) | official tree-sitter org | **none bundled**, each grammar is a separate `go get` (e.g. `tree-sitter/tree-sitter-javascript`), or load `.so` at runtime via purego | Newer, tracks upstream. API: `NewParser()`, `SetLanguage()`, `Parse(code, nil)`, `tree.RootNode()`, `root.ToSexp()`. **You must call `Close()`** on Parser/Tree/TreeCursor/Query/QueryCursor (CGO finalizer bug). More assembly required but cleaner long-term.                                                                                                   |
 
 Both require **CGO** (the runtime and every grammar are C). That is the single
 biggest architectural consequence for a Go tool, see 1.5.
@@ -107,13 +107,13 @@ representation," exactly what a complexity walker would do.
 
 ### 1.5 Language-native AST vs universal parsers
 
-|   | Native (`go/ast`, etc.) | tree-sitter (universal) |
-|---|---|---|
-| Accuracy | Highest (semantic, type-aware) | High (syntactic CST; no types) |
-| Languages | One per parser; only Go is free in-process for a Go tool | 100+ grammars |
-| Dependencies | stdlib for Go; would need a toolchain per other lang | CGO + N C grammars |
-| Effort | Trivial for Go, impractical to cover 20 langs | Moderate: bindings + per-lang node tables |
-| Robustness | Fails on non-compiling/partial files | Error-recovers |
+|              | Native (`go/ast`, etc.)                                  | tree-sitter (universal)                   |
+| ------------ | -------------------------------------------------------- | ----------------------------------------- |
+| Accuracy     | Highest (semantic, type-aware)                           | High (syntactic CST; no types)            |
+| Languages    | One per parser; only Go is free in-process for a Go tool | 100+ grammars                             |
+| Dependencies | stdlib for Go; would need a toolchain per other lang     | CGO + N C grammars                        |
+| Effort       | Trivial for Go, impractical to cover 20 langs            | Moderate: bindings + per-lang node tables |
+| Robustness   | Fails on non-compiling/partial files                     | Error-recovers                            |
 
 For a **polyglot** tool, native parsers do not scale (you would embed 20
 compilers). tree-sitter is the only realistic accurate-parser path, at the cost
@@ -124,7 +124,7 @@ of CGO.
 ### 2.1 lizard (terryyin/lizard), tokenize, do not parse
 
 lizard deliberately avoids full parsing ("Header-Free CCA"): it computes how
-complex code *looks*, not what it *is*, so it needs no headers/imports/build
+complex code _looks_, not what it _is_, so it needs no headers/imports/build
 context. Pipeline: a **regex tokenizer** (`generate_tokens`) emits tokens;
 processor stages strip comments/whitespace, count NLOC and tokens, detect function
 boundaries via a **state machine / nesting stack**, and a `condition_counter`
@@ -157,7 +157,7 @@ strings vs comments vs code). scc is itself **pure Go**, so its internals are
 directly reusable/vendorable.
 ([scc repo](https://github.com/boyter/scc))
 
-**scc's "complexity"** is *not* cyclomatic: while scanning code state, if it sees
+**scc's "complexity"** is _not_ cyclomatic: while scanning code state, if it sees
 a branch keyword/operator from that language's list in
 [`languages.json`](https://github.com/boyter/scc), e.g. Java's
 `for if switch while else || && != ==`, it does +1. It is a **whole-file sum**,
@@ -170,7 +170,7 @@ recursion** (no AST). Good for ranking files: `scc --by-file -s complexity`.
 **scc's COCOMO:** classic Boehm effort model. Three profiles (a,b,c,d): organic
 `2.4,1.05,2.5,0.38`, semi-detached `3.0,1.12,2.5,0.35`, embedded
 `3.6,1.20,2.5,0.32`. Effort = a*KLOC^b*EAF; schedule = c*Effort^d; cost =
-effort*avg-wage*overhead. Tunable via `--eaf`, `--avg-wage` (default around
+effort*avg-wage\*overhead. Tunable via `--eaf`, `--avg-wage` (default around
 $56k), `--overhead` (2.4), `--cocomo-project-type`. Coverage: 200+ languages.
 tokei is similar for LOC but has no complexity metric.
 
@@ -189,7 +189,7 @@ Counting `if/for/while/case/catch/&&/||/?` (the lizard/scc approach):
 
 ### 2.4 Indentation / whitespace complexity, fully parser-free
 
-Adam Tornhill's proxy (from *Software Design X-Rays* /
+Adam Tornhill's proxy (from _Software Design X-Rays_ /
 [indent-complexity-proxy](https://github.com/adamtornhill/indent-complexity-proxy)):
 strip blank lines and comments, normalize tabs to spaces, then count **logical
 indentation** per line (leading whitespace / spaces-per-indent). Configurable
@@ -205,7 +205,7 @@ depth across virtually all languages.
   ["Reading beside the lines"](https://plg.uwaterloo.ca/~migod/papers/2008/scam08.pdf),
   indentation statistics correlate with McCabe/Halstead; raw vs logical
   indentation barely differs.
-- **Accuracy vs true AST:** lowest of the three, but the *cheapest possible* and
+- **Accuracy vs true AST:** lowest of the three, but the _cheapest possible_ and
   best as a **trend** signal. Tornhill's key move: pair it with LOC over git
   history, flat LOC + rising indentation = complexity growth. CodeScene ships this
   as "complexity trends."
@@ -240,12 +240,12 @@ depth across virtually all languages.
 
 **What it realistically takes to add complexity to codelens:**
 
-- *Indentation lane:* around 1 day, no deps. Read blob bytes, normalize
+- _Indentation lane:_ around 1 day, no deps. Read blob bytes, normalize
   whitespace, sum logical indents. Instant polyglot coverage.
-- *Keyword lane:* days-to-weeks. Either vendor scc's scanner + keyword tables
+- _Keyword lane:_ days-to-weeks. Either vendor scc's scanner + keyword tables
   (whole-file, 200+ langs) or reimplement lizard-style tokenizing for per-function
   CCN on the around-10 langs you care about.
-- *tree-sitter lane:* weeks + ongoing. CGO build, ship N grammars, maintain
+- _tree-sitter lane:_ weeks + ongoing. CGO build, ship N grammars, maintain
   per-grammar decision-node tables, cross-compilation/binary-size pain. Buys
   accurate cyclomatic + cognitive per-function.
 
@@ -284,15 +284,15 @@ reading **file content at revisions**, which is the new capability. Options:
 
 ## 5. Recommendation matrix
 
-| Dimension | Indentation proxy | Keyword/token (scc/lizard style) | tree-sitter (parser) | Native `go/ast` (gocyclo/gocognit) |
-|---|---|---|---|---|
-| Language coverage | Any (universal) | around 20 (lizard) / 200+ (scc) via tables | 100+ grammars | Go only |
-| Accuracy vs true AST metric | Low (trend proxy) | Medium (good CCN approx; misses recursion) | High (syntactic; cognitive+cyclomatic) | Highest |
-| Granularity | Line/file | File (scc) or function (lizard) | Function | Function |
-| Go impl effort | Trivial (around 1 day) | Medium (vendor scc / reimpl lizard) | High (CGO + per-grammar tables) | Trivial (existing libs) |
-| Performance | Fastest | Very fast | Slower (parse cost) | Fast |
-| Dependencies | None | None (pure Go if scc-based) | **CGO + N C grammars** (or purego + .so) | stdlib |
-| Robustness on partial/dirty files | High | High | High (error recovery) | Low (needs compilable) |
+| Dimension                         | Indentation proxy      | Keyword/token (scc/lizard style)           | tree-sitter (parser)                     | Native `go/ast` (gocyclo/gocognit) |
+| --------------------------------- | ---------------------- | ------------------------------------------ | ---------------------------------------- | ---------------------------------- |
+| Language coverage                 | Any (universal)        | around 20 (lizard) / 200+ (scc) via tables | 100+ grammars                            | Go only                            |
+| Accuracy vs true AST metric       | Low (trend proxy)      | Medium (good CCN approx; misses recursion) | High (syntactic; cognitive+cyclomatic)   | Highest                            |
+| Granularity                       | Line/file              | File (scc) or function (lizard)            | Function                                 | Function                           |
+| Go impl effort                    | Trivial (around 1 day) | Medium (vendor scc / reimpl lizard)        | High (CGO + per-grammar tables)          | Trivial (existing libs)            |
+| Performance                       | Fastest                | Very fast                                  | Slower (parse cost)                      | Fast                               |
+| Dependencies                      | None                   | None (pure Go if scc-based)                | **CGO + N C grammars** (or purego + .so) | stdlib                             |
+| Robustness on partial/dirty files | High                   | High                                       | High (error recovery)                    | Low (needs compilable)             |
 
 ### Recommendation for codelens (polyglot, read-only, Go)
 
@@ -301,7 +301,7 @@ the dataviz skill notes:
 
 1. **Ship indentation-based complexity first.** Zero dependencies, no CGO,
    universal, and paired with LOC over git history it delivers the highest-value
-   signal (complexity *trend*/growth) that matches codelens's evolutionary-
+   signal (complexity _trend_/growth) that matches codelens's evolutionary-
    analysis identity. This is the 80/20.
 2. **Add a keyword-counting lane by vendoring scc's pure-Go scanner +
    `languages.json`.** Gives a defensible "cyclomatic-ish" per-file number across

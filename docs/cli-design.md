@@ -221,12 +221,13 @@ JSON is the one representation (see
 
 Every envelope is self-describing along two axes:
 
-- `shape` is one of `table` | `tree` | `graph` | `matrix` | `series`, and the
-  payload key follows from it (`rows` for `table`; `nodes` and `edges` for
-  `graph`; and so on). Today every analysis is `shape: "table"` with a `rows`
-  payload; the other shapes are introduced with the analyses that need them
-  (hierarchy, graph, matrix, and time-series outputs). `print-log-command`
-  declares a sixth shape, `text` (see §6.5).
+- `shape` is one of `table` | `text`, and the payload key follows from it (`rows`
+  for `table`). Every analysis is `shape: "table"` with a `rows` payload;
+  `print-log-command` declares the other member, `text` (see §6.5). The set holds
+  only shapes the binary actually emits: a new shape is added by the change that
+  makes it emittable, so `schema` never advertises a payload topology no command
+  produces. A hierarchy and a graph shape are both anticipated, and each will
+  arrive with the analysis that needs it.
 - `semantics` maps each field to a semantic type (`filepath`, `percentage`,
   `count`, `duration_months`, `person`, ...). This is what codelens knows
   because it authored the data, and it is what lets a downstream renderer derive

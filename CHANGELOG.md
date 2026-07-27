@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Canonical shape-aware envelope: `shape`, `semantics`, `transforms` (ADR
   0008).** Every analysis envelope is now self-describing along two new axes.
-  `shape` names the payload topology (`table` today; `tree`, `graph`, `matrix`,
-  and `series` are declared for future analyses) and the payload key follows from
-  it. `semantics` maps each emitted payload field to a semantic type from a closed
+  `shape` names the payload topology and the payload key follows from it. Its
+  closed set holds only the shapes the binary emits, `table` and `text`, so a
+  shape read from `schema` is never a promise the binary cannot keep; a new shape
+  is added by the change that makes it emittable. `semantics` maps each emitted
+  payload field to a semantic type from a closed
   12-member vocabulary (`filepath`, `person`, `date`, `commit_id`, `text`,
   `label`, `flag`, `count`, `loc`, `percentage`, `ratio`, `duration_months`), so a
   downstream renderer can derive a chart without domain knowledge; it is always

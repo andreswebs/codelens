@@ -18,8 +18,9 @@ semantic shape).
 The direction for codelens makes this the wrong surface. codelens is a code
 visualization _data_ engine: it should hand any renderer or agent the data plus
 the meaning of that data, and let downstream tools (Flint, Vega-Lite, GraphML,
-CodeCharta `.cc.json`) produce pixels. That requires output shapes beyond flat
-rows (hierarchy, graph, matrix, series) and requires carrying the semantic
+CodeCharta `.cc.json`) produce pixels. That requires the envelope to be able to
+express a payload topology beyond flat rows (a hierarchy or a graph, for
+example) and requires carrying the semantic
 meaning of each field, which only codelens knows because it authored the data. A
 `--format` matrix of serializations cannot express either need, and a
 `--format flint` would wrongly frame a lossy downstream projection as a
@@ -38,10 +39,15 @@ Specifics:
 - **The canonical envelope is shape-aware and self-describing.** In addition to
   the existing `schema_version`, `ok`, `analysis`, and optional `params`, it
   carries:
-  - `shape`: one of `table` | `tree` | `graph` | `matrix` | `series`. The payload
-    key and structure follow from `shape` (for example `rows` for `table`;
-    `nodes` and `edges` for `graph`). Today every analysis is `shape: "table"`;
-    the other shapes are introduced with the analyses that need them.
+  - `shape`: a member of a closed set that names only the topologies the binary
+    actually emits, currently `table` | `text`. The payload key and structure
+    follow from `shape` (`rows` for `table`). Every analysis is `shape: "table"`;
+    `print-log-command` is `text`, a bare command line rather than a data
+    payload. A shape is added to the set by the change that makes it emittable,
+    never ahead of it: `schema` is the runtime source of truth an agent relies
+    on, so a declared shape no command produces would be an unkeepable promise.
+    A hierarchy shape and a graph shape are both anticipated and will arrive with
+    the analyses that need them.
   - `semantics`: a map from field name to a semantic type (for example `entity`
     is a filepath, `degree` a percentage, `age_months` a duration, `main_dev` a
     person). This is the asset only codelens can provide, and it is what makes
@@ -86,9 +92,9 @@ Rules that carry over unchanged:
   deliberately, freeing column naming and structure from an external contract.
 - **Human terminal ergonomics are traded away** for agent-first cleanliness; `jq`
   covers the gap.
-- **Shape-aware output is unlocked** without a format zoo: hierarchy, graph,
-  matrix, and series payloads become first-class, which is what lets the
-  hierarchical and graph visualizations drop bespoke reshaping glue.
+- **Shape-aware output is unlocked** without a format zoo: a payload topology
+  beyond flat rows becomes expressible, which is what lets the hierarchical and
+  graph visualizations drop bespoke reshaping glue as those shapes ship.
 - **Downstream viz transforms are decoupled** and can evolve independently of the
   core, each consuming `shape` + `semantics` + payload.
 - **New required envelope fields** (`shape`, `semantics`) must be added to every

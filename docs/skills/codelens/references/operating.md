@@ -106,11 +106,12 @@ echoing every declared flag at its effective value, defaults included, so a
 run is self-documenting: `coupling`, `sum-of-coupling`, `code-age`, and
 `messages`. Flagless analyses omit `params`.
 
-`shape` is a fixed, per-command member of the closed set `table`, `tree`,
-`graph`, `matrix`, `series`, `text`. Every analysis is `shape: "table"` today;
-the sole exception is `print-log-command`, which is `shape: "text"` and emits a
-bare command line by design, so it stays copy-pasteable. The payload key follows
-from the shape (`rows` for a table).
+`shape` is a fixed, per-command member of the closed set `table`, `text`. Every
+analysis is `shape: "table"`; the sole exception is `print-log-command`, which is
+`shape: "text"` and emits a bare command line by design, so it stays
+copy-pasteable. The payload key follows from the shape (`rows` for a table). The
+set names only the shapes codelens emits, so a shape read from `schema` can
+always be relied on; new shapes appear as the analyses that need them ship.
 
 `semantics` maps each emitted column to a member of a closed 12-entry
 vocabulary. It exists so a renderer or a downstream chart spec can be derived

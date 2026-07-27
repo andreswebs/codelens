@@ -122,8 +122,10 @@ TTY.
 ```
 
 - `shape` is the payload topology and names the payload key: a `table` result
-  carries `rows`. Every analysis is `table` today; the other shapes (`tree`,
-  `graph`, `matrix`, `series`) arrive with the analyses that need them.
+  carries `rows`. Every analysis is `table`; the only other member is `text`, for
+  `print-log-command`. The set names only what the binary emits, so a new shape
+  arrives with the analysis that needs it rather than being announced ahead of
+  time.
 - `semantics` maps each column to a semantic type (`filepath`, `count`,
   `percentage`, `duration_months`, and so on). This is what lets a downstream
   renderer derive a chart without domain knowledge: `codelens` authored the

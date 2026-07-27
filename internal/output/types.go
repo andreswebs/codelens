@@ -152,19 +152,16 @@ func (w *fieldWriter) field(key string, val any) error {
 	return nil
 }
 
-// payloadKey returns the JSON key the shape's payload is written under. Only the
-// table shape is reachable today; the other declared shapes panic, matching
-// toCLIFlag's treatment of an unsupported flag type, so a descriptor that
-// declares a not-yet-emitted shape surfaces at first run rather than as a
-// silently misnamed key. The graph payload (which needs both "nodes" and
-// "edges") is deferred with the rest: guessing its Go shape now, without an
-// analysis that needs it, would be speculative.
+// payloadKey returns the JSON key the shape's payload is written under. "table"
+// is the only data shape, and it carries "rows"; "text" never reaches this
+// function, because print-log-command writes a bare command line straight to the
+// writer and never builds a Result. An unrecognized shape is a descriptor typo,
+// reachable only via programmer error, and panics as the backstop, matching
+// toCLIFlag's treatment of an unsupported flag type.
 func payloadKey(shape string) string {
 	switch shape {
 	case "table":
 		return "rows"
-	case "tree", "graph", "matrix", "series":
-		panic(fmt.Sprintf("output: shape %q is declared but not yet emitted (deferred epic cod-304f)", shape))
 	}
 	panic(fmt.Sprintf("output: unknown payload shape %q", shape))
 }
