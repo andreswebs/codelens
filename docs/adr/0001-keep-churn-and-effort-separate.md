@@ -1,8 +1,4 @@
----
-status: accepted
----
-
-# Keep churn and effort as separate aggregation packages
+# 0001: Keep churn and effort as separate aggregation packages
 
 ## Context
 

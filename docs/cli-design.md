@@ -85,19 +85,19 @@ for code-maat's "global flag that no-ops for 19 of 20 analyses" problem.
 
 ### 4.2 Global flags (all analysis subcommands)
 
-| Flag                    | Default | Meaning                                           |
-| ----------------------- | ------- | ------------------------------------------------- |
-| `--log FILE`            | stdin   | Read log from FILE; `--log -` is explicit stdin   |
-| `--input-encoding ENC`  | UTF-8   | Non-UTF-8 log encoding                            |
-| `--fields PATHS`        | (all)   | Comma-separated JSON field projection             |
-| `--rows N`              | (all)   | Cap output rows after sorting                     |
-| `--include GLOB`        | -       | Keep only entities matching GLOB (repeatable)     |
-| `--exclude GLOB`        | -       | Drop entities matching GLOB (repeatable)          |
-| `--group FILE`          | -       | Layer-mapping file                                |
-| `--group-format FMT`    | `text`  | `text` (`=>` lines) or `json`                     |
-| `--team-map FILE`       | -       | author→team map                                   |
-| `--team-map-format FMT` | `csv`   | `csv` or `json`                                   |
-| `--temporal-period N`   | -       | Collapse commits into sliding N-day change sets   |
+| Flag                    | Default | Meaning                                         |
+| ----------------------- | ------- | ----------------------------------------------- |
+| `--log FILE`            | stdin   | Read log from FILE; `--log -` is explicit stdin |
+| `--input-encoding ENC`  | UTF-8   | Non-UTF-8 log encoding                          |
+| `--fields PATHS`        | (all)   | Comma-separated JSON field projection           |
+| `--rows N`              | (all)   | Cap output rows after sorting                   |
+| `--include GLOB`        | -       | Keep only entities matching GLOB (repeatable)   |
+| `--exclude GLOB`        | -       | Drop entities matching GLOB (repeatable)        |
+| `--group FILE`          | -       | Layer-mapping file                              |
+| `--group-format FMT`    | `text`  | `text` (`=>` lines) or `json`                   |
+| `--team-map FILE`       | -       | author→team map                                 |
+| `--team-map-format FMT` | `csv`   | `csv` or `json`                                 |
+| `--temporal-period N`   | -       | Collapse commits into sliding N-day change sets |
 
 Format for `--group`/`--team-map` is chosen by an **explicit** `*-format` flag
 (no content sniffing or extension guessing), defaulting to the text/CSV form.
@@ -296,16 +296,16 @@ stdout; `hint` and `details` are omitted when empty.
 
 ### 7.2 Exit codes
 
-codelens follows the family-wide taxonomy in
+codelens follows the taxonomy in
 [ADR 0002](adr/0002-exit-code-taxonomy.md) (BSD `sysexits.h` range):
 
-| Code | Code string(s)                                              | Meaning                     | Examples                                                                                    |
-| ---- | ----------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------- |
-| 0    | -                                                           | success (incl. empty result) | any analysis that ran                                                                       |
-| 64   | `unknown_command`, `unknown_flag`, `unknown_format`, `unknown_schema_command`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now`, `invalid_after_date` | usage error (EX_USAGE) | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group |
-| 65   | `parse_error`, `invalid_control_char`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map` | data error (EX_DATAERR) | unparseable or empty log, disallowed control character, malformed `--team-map`, churn analysis on a log with no numstat |
-| 70   | `internal_error`                                            | internal / unexpected (EX_SOFTWARE) | a bug; an unexpected internal fault, reported as a one-line coded error like any other |
-| 74   | `log_open_failed`, `input_file_open_failed`                | I/O error (EX_IOERR)        | unreadable `--log`, `--group`, or `--team-map` file                                         |
+| Code | Code string(s)                                                                                                                                                                                                                                                       | Meaning                             | Examples                                                                                                                |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 0    | -                                                                                                                                                                                                                                                                    | success (incl. empty result)        | any analysis that ran                                                                                                   |
+| 64   | `unknown_command`, `unknown_flag`, `unknown_format`, `unknown_schema_command`, `invalid_value`, `missing_required_flag`, `invalid_field`, `invalid_glob`, `invalid_group`, `invalid_temporal_period`, `invalid_expression`, `invalid_time_now`, `invalid_after_date` | usage error (EX_USAGE)              | unknown flag/subcommand, missing/invalid flag value, `messages` without `--expression`, malformed glob/group            |
+| 65   | `parse_error`, `invalid_control_char`, `empty_log`, `missing_messages`, `missing_metrics`, `invalid_temporal_date`, `invalid_team_map`                                                                                                                               | data error (EX_DATAERR)             | unparseable or empty log, disallowed control character, malformed `--team-map`, churn analysis on a log with no numstat |
+| 70   | `internal_error`                                                                                                                                                                                                                                                     | internal / unexpected (EX_SOFTWARE) | a bug; an unexpected internal fault, reported as a one-line coded error like any other                                  |
+| 74   | `log_open_failed`, `input_file_open_failed`                                                                                                                                                                                                                          | I/O error (EX_IOERR)                | unreadable `--log`, `--group`, or `--team-map` file                                                                     |
 
 Coded errors carry a stable string `code` and their own exit code via a
 dedicated `terr`-style package. Usage errors from the CLI framework are
@@ -459,20 +459,20 @@ Design points:
 
 ## 11. Audit findings → resolutions
 
-| code-maat finding                 | codelens resolution                                                         |
-| --------------------------------- | --------------------------------------------------------------------------- |
-| Errors/traces on stdout           | All diagnostics on stderr; stdout is results only                           |
-| Stack traces leaked to users      | No traces ever; every failure is a one-line coded error (silent posture)    |
-| No `--version`                    | `codelens --version` prints the bare build version                          |
-| Opaque `is it a valid logfile?`   | Named `parse_error` with entry/line `details` + hint to `print-log-command` |
-| Input contract undiscoverable     | `codelens print-log-command` emits the exact git command                    |
-| `--verbose-results` no-ops 19/20  | `--verbose` lives only on `coupling`                                        |
+| code-maat finding                 | codelens resolution                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| Errors/traces on stdout           | All diagnostics on stderr; stdout is results only                            |
+| Stack traces leaked to users      | No traces ever; every failure is a one-line coded error (silent posture)     |
+| No `--version`                    | `codelens --version` prints the bare build version                           |
+| Opaque `is it a valid logfile?`   | Named `parse_error` with entry/line `details` + hint to `print-log-command`  |
+| Input contract undiscoverable     | `codelens print-log-command` emits the exact git command                     |
+| `--verbose-results` no-ops 19/20  | `--verbose` lives only on `coupling`                                         |
 | CSV-only, prose-documented schema | Single JSON representation + `schema --command` with per-column `row_schema` |
-| No introspection                  | `schema` command, self-describing                                           |
-| Unsandboxed `-o` writes           | `--outfile` dropped; stdout + shell redirection                             |
-| No agent knowledge                | `AGENTS.md` + skill file                                                    |
-| Bespoke hand-generated input      | stdin pipe workflow + `print-log-command`                                   |
-| Dead `:else` in main              | N/A (clean Go control flow)                                                 |
+| No introspection                  | `schema` command, self-describing                                            |
+| Unsandboxed `-o` writes           | `--outfile` dropped; stdout + shell redirection                              |
+| No agent knowledge                | `AGENTS.md` + skill file                                                     |
+| Bespoke hand-generated input      | stdin pipe workflow + `print-log-command`                                    |
+| Dead `:else` in main              | N/A (clean Go control flow)                                                  |
 
 ### Agent-DX scale: target
 

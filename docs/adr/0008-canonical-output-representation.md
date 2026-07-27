@@ -1,16 +1,12 @@
----
-status: accepted
----
-
-# One canonical, shape-aware JSON representation (drop the format matrix)
-
-Note: `0006-output-contract.md` is the authoritative decision record
-for the stream and envelope contract. This document provides
-repository-specific detail on top of it: codelens's canonical
-shape-aware JSON representation. Where the two disagree, the numbered
-ADR wins.
+# 0008: Canonical output representation
 
 ## Context
+
+This ADR amends `0006-output-contract.md`. That ADR's result-envelope
+section admits a format flag with an opt-in human-readable rendering and
+an optional NDJSON mode; this ADR removes both in favour of a single
+shape-aware JSON envelope. Its stream separation, error envelope,
+warning, and self-description decisions carry over unchanged.
 
 codelens currently exposes a global `--format` flag with four values: `json`
 (the self-describing envelope), `ndjson`, `csv` (kebab-case headers targeting a

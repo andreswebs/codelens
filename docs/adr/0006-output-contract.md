@@ -1,5 +1,10 @@
 # 0006: Output contract
 
+> Amended by `0008-canonical-output-representation.md`: the result
+> envelope is now a single shape-aware JSON representation, with no
+> format flag, no human-readable rendering, and no NDJSON mode. The
+> rest of this ADR stands.
+
 ## Context
 
 Tools in this project are agent-first, and the preceding ADRs (exit

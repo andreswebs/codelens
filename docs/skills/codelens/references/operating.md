@@ -222,15 +222,15 @@ message, hint}}`), for every `--format` value including `text` and `table`.
 there is no `✗ <message>` text error path, so parse the envelope's `message` and
 `hint` fields directly.
 
-Exit codes follow the family-wide taxonomy in ADR 0002 (BSD `sysexits.h`):
+Exit codes follow the taxonomy in ADR 0002 (BSD `sysexits.h`):
 
-| Exit | Meaning               | Examples                                                              |
-| ---- | --------------------- | --------------------------------------------------------------------- |
-| 0    | success (incl. empty) | any analysis that ran                                                 |
+| Exit | Meaning               | Examples                                                                                    |
+| ---- | --------------------- | ------------------------------------------------------------------------------------------- |
+| 0    | success (incl. empty) | any analysis that ran                                                                       |
 | 64   | usage error           | unknown flag/subcommand, bad value, `messages` without `--expression`, malformed glob/group |
-| 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat |
-| 70   | internal              | a bug; an unexpected internal fault, reported as a one-line coded error |
-| 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                   |
+| 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat            |
+| 70   | internal              | a bug; an unexpected internal fault, reported as a one-line coded error                     |
+| 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                                         |
 
 Non-fatal advisories are emitted as single-line JSON **warning** diagnostics on
 stderr, distinguished from errors by `level: "warning"` (and no `ok` field):
