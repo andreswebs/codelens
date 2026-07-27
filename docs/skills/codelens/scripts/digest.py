@@ -104,13 +104,22 @@ def build_digest(d: Path) -> list[str]:
     w(f"- entities: {summ.get('number-of-entities')}")
     w(f"- entity-changes: {summ.get('number-of-entities-changed')}")
 
-    # --- window (from git.log first/last dates) ---
+    # --- window (from git.log entry-header dates) ---
+    # Entry headers are --<hash>--<date>--<author>--<subject> (see
+    # `codelens print-log-command`); numstat lines never start with "--", and the
+    # 3-field stock git2 header (no subject) still matches through the author
+    # separator. Anchoring on the header is what keeps a date inside a commit
+    # subject or a file path out of the window, and scanning every line rather
+    # than sampling the file's ends is what keeps a large commit from hiding the
+    # boundary: the log is reverse-chronological, so the oldest entry is at the
+    # tail behind however many numstat lines it carries.
     gl = d / "git.log"
     if gl.is_file():
-        text = gl.read_text(encoding="utf-8")
-        dates: list[str] = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", text[:2000] + text[-2000:])
+        header_date = re.compile(r"^--[0-9a-f]+--(\d{4}-\d{2}-\d{2})--")
+        with gl.open(encoding="utf-8") as f:
+            dates = sorted({m.group(1) for line in f if (m := header_date.match(line))})
         if dates:
-            w(f"- window dates seen: {min(dates)} .. {max(dates)}")
+            w(f"- window dates seen: {dates[0]} .. {dates[-1]} ({len(dates)} active dates)")
 
     # --- hotspots (revisions), split code vs docs/config ---
     revs = load_rows(d / "revisions.json")

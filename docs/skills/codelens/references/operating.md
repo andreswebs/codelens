@@ -284,3 +284,41 @@ The skill's Python render scripts follow the same convention: they print their
 `wrote ...` summary (and uv's `Installed N packages`) to stderr on success, so a
 wrapper must judge them by exit code, never by stderr being empty. See
 [reporting.md](reporting.md).
+
+### Inspecting stderr alone: a zsh gotcha, not a codelens bug
+
+To read only the diagnostics, the usual idiom discards stdout while keeping stderr
+on the pipe:
+
+```sh
+codelens coupling --log git.log 2>&1 >/dev/null | jq .
+```
+
+**In zsh that idiom is broken and makes codelens look like it violates the stream
+contract.** zsh's `MULTIOS` option (on by default) treats a second redirection of
+the same descriptor as a request to write to BOTH destinations, so stdout is teed
+to `/dev/null` AND to the pipe. The results envelope then appears alongside the
+warning, and the output reads as though the analysis result were emitted on stderr.
+It was not: the tee happened in the shell, after codelens had already written each
+stream correctly.
+
+The tell is a second line whose payload is a full result envelope
+(`"ok":true,"analysis":...`) rather than a diagnostic (`"level":"warning"`). Before
+reporting a stream-separation bug, re-run one of these:
+
+```sh
+# portable and unambiguous: separate files, then inspect each
+codelens coupling --log git.log >out.json 2>err.txt
+
+# zsh, disabling the tee for this shell
+unsetopt multios
+codelens coupling --log git.log 2>&1 >/dev/null | jq .
+
+# or run the pipeline under bash, where the idiom behaves as written
+bash -c 'codelens coupling --log git.log 2>&1 >/dev/null' | jq .
+```
+
+Verified on zsh 5.9.2: the idiom yields 2 lines on the pipe, while all three
+alternatives yield 1. Note `1>/dev/null 2>&1` is teed the same way, so reordering
+the redirections is not a fix. Separate files are the safest default in a script
+that must work under either shell.

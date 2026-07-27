@@ -155,9 +155,60 @@ class TestWindow(DigestCase):
     def test_window_dates_from_git_log(self) -> None:
         _rc, _stderr, md = self.run_digest(
             {"summary.json": [{"statistic": "number-of-commits", "value": 3}]},
-            git_log="--2026-01-05--author\n--2026-06-20--author\n",
+            git_log="--a1b2c3d--2026-06-20--Bob--newest\n--e4f5a6b--2026-01-05--Bob--oldest\n",
         )
         self.assertIn("window dates seen: 2026-01-05 .. 2026-06-20", md)
+
+    def test_oversized_oldest_entry_does_not_collapse_window(self) -> None:
+        # The oldest (tail) entry carries a numstat block far larger than the old
+        # 2,000-byte end sample, so a sampling implementation never reaches its
+        # header date and collapses the window onto the newest date. Regression.
+        numstat = "".join(f"{i}\t{i}\tsrc/file_{i:04d}.go\n" for i in range(400))
+        git_log = (
+            "--a1b2c3d--2026-07-27--Bob--newest change\n" + numstat + "\n"
+            "--e4f5a6b--2026-07-14--Bob--initial commit\n" + numstat + "\n"
+        )
+        # The oldest header must fall beyond both the head and tail samples an
+        # end-sampling implementation would read: newest numstat pushes it past
+        # the head, its own numstat keeps it out of the tail.
+        self.assertGreater(len(numstat), 2000)
+        _rc, _stderr, md = self.run_digest(
+            {"summary.json": [{"statistic": "number-of-commits", "value": 2}]},
+            git_log=git_log,
+        )
+        self.assertIn("window dates seen: 2026-07-14 .. 2026-07-27", md)
+
+    def test_date_in_subject_does_not_widen_window(self) -> None:
+        git_log = (
+            "--a1b2c3d--2026-01-02--Bob--fix the 1999-12-31 rollover\n"
+            "1\t0\ta.go\n\n"
+            "--e4f5a6b--2026-01-05--Bob--another 2099-09-09 mention\n"
+            "1\t0\tb.go\n"
+        )
+        _rc, _stderr, md = self.run_digest(
+            {"summary.json": [{"statistic": "number-of-commits", "value": 2}]},
+            git_log=git_log,
+        )
+        self.assertIn("window dates seen: 2026-01-02 .. 2026-01-05", md)
+        self.assertNotIn("1999-12-31", md)
+        self.assertNotIn("2099-09-09", md)
+
+    def test_three_field_stock_header_is_recognised(self) -> None:
+        # Stock git2 header has no commit subject: --<hash>--<date>--<author>.
+        git_log = "--a1b2c3d--2026-03-01--Bob\n1\t0\ta.go\n--e4f5a6b--2026-03-08--Bob\n1\t0\tb.go\n"
+        _rc, _stderr, md = self.run_digest(
+            {"summary.json": [{"statistic": "number-of-commits", "value": 2}]},
+            git_log=git_log,
+        )
+        self.assertIn("window dates seen: 2026-03-01 .. 2026-03-08", md)
+
+    def test_single_commit_window(self) -> None:
+        git_log = "--a1b2c3d--2026-05-05--Bob--only commit\n1\t0\ta.go\n"
+        _rc, _stderr, md = self.run_digest(
+            {"summary.json": [{"statistic": "number-of-commits", "value": 1}]},
+            git_log=git_log,
+        )
+        self.assertIn("window dates seen: 2026-05-05 .. 2026-05-05 (1 active dates)", md)
 
 
 class TestExitCodes(DigestCase):

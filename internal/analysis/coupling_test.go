@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/andreswebs/codelens/internal/model"
@@ -268,15 +269,28 @@ func weaklyCoupled(prefix, a, b string, shared, alone int) []model.Modification 
 	return mods
 }
 
-// TestCoupling_WarnsWhenAllFiltered: a real but weak pair (degree 20%) run at the
+// warnBlocking extracts the machine-readable blocking list from a recorded
+// coupling_all_filtered advisory, failing the test if the details are not the
+// expected shape.
+func warnBlocking(t *testing.T, w recordedWarn) []string {
+	t.Helper()
+	d, ok := w.details.(map[string]any)
+	if !ok {
+		t.Fatalf("details is %T, want map[string]any", w.details)
+	}
+	blocking, ok := d["blocking"].([]string)
+	if !ok {
+		t.Fatalf("details.blocking is %T, want []string", d["blocking"])
+	}
+	return blocking
+}
+
+// TestCoupling_WarnsWhenAllFiltered: a genuinely weak pair (degree 20%, but with
+// its revision counts clearing --min-revs and --min-shared-revs) run at the
 // default min-coupling 30 yields no rows and exactly one coupling_all_filtered
-// warning naming the highest observed degree and the effective threshold.
+// warning that attributes the empty result to --min-coupling alone.
 func TestCoupling_WarnsWhenAllFiltered(t *testing.T) {
-	// shared 5, alone 5 -> entityRevs = coupledRevs = 10, average = 10,
-	// degree = 5/10 = 50%. To land on 20%: shared 2, alone 8 gives revs 10 each,
-	// average 10, degree 2/10 = 20% -- but shared 2 < min-shared-revs, still a
-	// candidate. Keep shared at the threshold and dilute via alone instead.
-	mods := weaklyCoupled("p", "A", "B", 5, 20) // average 25, degree 5/25 = 20%
+	mods := weaklyCoupled("p", "A", "B", 5, 20) // average 25, shared 5, degree 5/25 = 20%
 
 	var warns []recordedWarn
 	opts := couplingOpts()
@@ -293,15 +307,73 @@ func TestCoupling_WarnsWhenAllFiltered(t *testing.T) {
 	if w.code != "coupling_all_filtered" {
 		t.Errorf("code = %q, want coupling_all_filtered", w.code)
 	}
-	d, ok := w.details.(map[string]any)
+	if blocking := warnBlocking(t, w); !reflect.DeepEqual(blocking, []string{"min-coupling"}) {
+		t.Errorf("blocking = %v, want [min-coupling]", blocking)
+	}
+	observed, ok := w.details.(map[string]any)["observed"].(map[string]any)
 	if !ok {
-		t.Fatalf("details is %T, want map[string]any", w.details)
+		t.Fatalf("details.observed missing or wrong type: %+v", w.details)
 	}
-	if d["max_degree"] != 20 {
-		t.Errorf("details.max_degree = %v, want 20", d["max_degree"])
+	if observed["max_degree"] != 20 {
+		t.Errorf("observed.max_degree = %v, want 20", observed["max_degree"])
 	}
-	if d["min_coupling"] != 30 {
-		t.Errorf("details.min_coupling = %v, want 30", d["min_coupling"])
+	if !strings.Contains(w.hint, "--min-coupling") {
+		t.Errorf("hint = %q, want it to name --min-coupling (the binding threshold)", w.hint)
+	}
+}
+
+// TestCoupling_FilteredOnlySharedRevs: a 100%-degree pair whose shared revisions
+// (4) fall below --min-shared-revs but whose average revisions (8) clear
+// --min-revs is attributed to --min-shared-revs alone. The hint must not tell the
+// caller to lower --min-coupling, which the 100% degree already clears.
+func TestCoupling_FilteredOnlySharedRevs(t *testing.T) {
+	mods := weaklyCoupled("q", "C", "D", 4, 4) // revs 8 each, shared 4, degree 4/8 = 50%
+
+	var warns []recordedWarn
+	opts := couplingOpts()
+	opts.Warn = recordingSink(&warns)
+
+	if rows := couplingResultRows(t, mods, opts); len(rows) != 0 {
+		t.Fatalf("rows = %+v, want empty (all filtered)", rows)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("warnings = %d, want 1: %+v", len(warns), warns)
+	}
+	if blocking := warnBlocking(t, warns[0]); !reflect.DeepEqual(blocking, []string{"min-shared-revs"}) {
+		t.Errorf("blocking = %v, want [min-shared-revs]", blocking)
+	}
+	if strings.Contains(warns[0].hint, "lower --min-coupling") {
+		t.Errorf("hint = %q, must not tell the caller to lower --min-coupling", warns[0].hint)
+	}
+}
+
+// TestCoupling_FilteredMultipleThresholds is the bug's reproduction shape: a pair
+// coupled at 100% but changing together only 3 times, so both --min-revs and
+// --min-shared-revs bind while --min-coupling is satisfied. Both binding
+// thresholds are named, in a stable order, and neither the hint nor blocking
+// implicates --min-coupling.
+func TestCoupling_FilteredMultipleThresholds(t *testing.T) {
+	mods := alwaysTogether("r", "A", "B", 3) // revs 3 each, shared 3, degree 100%
+
+	var warns []recordedWarn
+	opts := couplingOpts()
+	opts.Warn = recordingSink(&warns)
+
+	if rows := couplingResultRows(t, mods, opts); len(rows) != 0 {
+		t.Fatalf("rows = %+v, want empty (all filtered)", rows)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("warnings = %d, want 1: %+v", len(warns), warns)
+	}
+	w := warns[0]
+	if blocking := warnBlocking(t, w); !reflect.DeepEqual(blocking, []string{"min-revs", "min-shared-revs"}) {
+		t.Errorf("blocking = %v, want [min-revs min-shared-revs]", blocking)
+	}
+	if strings.Contains(w.hint, "lower --min-coupling") {
+		t.Errorf("hint = %q, must not tell the caller to lower --min-coupling", w.hint)
+	}
+	if !strings.Contains(w.hint, "--min-revs") || !strings.Contains(w.hint, "--min-shared-revs") {
+		t.Errorf("hint = %q, want it to name both binding thresholds", w.hint)
 	}
 }
 

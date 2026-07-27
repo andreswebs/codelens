@@ -125,6 +125,13 @@ func goldenCases(t *testing.T) []goldenCase {
 		// stdout-only harness structurally cannot express.
 		{"coupling_warning", []string{"coupling"}, weakCouplingLog(5, 12)},
 
+		// coupling_warning_revs (exit 0): the sibling attribution to
+		// coupling_warning. Here a.go and b.go are coupled at 100% but co-change
+		// only 3 times, so --min-revs and --min-shared-revs bind while
+		// --min-coupling is satisfied. Freezes that the hint names the revision
+		// thresholds and never blames --min-coupling (cod-7l0q).
+		{"coupling_warning_revs", []string{"coupling"}, weakCouplingLog(3, 0)},
+
 		// schema with no --command: the command list, including the errors
 		// inventory, so the inventory has golden coverage.
 		{"schema_list", []string{"schema"}, ""},

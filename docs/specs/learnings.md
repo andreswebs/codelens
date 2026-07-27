@@ -1458,3 +1458,33 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   delivered spec is a historical record whose requirement IDs closed tickets
   still cite. The superseded note goes at the top and points at ADR 0008; the
   requirement bodies stay byte-for-byte.
+
+- A diagnostic hint on a conjunction of thresholds must be attributed, not
+  hardcoded. The `coupling_all_filtered` warning blamed `--min-coupling`
+  unconditionally, yet `WithinThreshold` AND's four clauses (`--min-revs`,
+  `--min-shared-revs`, `--min-coupling`, `--max-coupling`). On a thin-history
+  repo the binding clauses are the revision counts, so the hint sent callers to a
+  flag that had excluded nothing (an agent, having no independent judgement, acts
+  on `hint` literally). The fix costs nothing extra: the candidate-pair loop
+  already walks every pair, so it now tracks the best observed degree, shared-revs
+  and average-revs, and names a threshold as binding only when its BEST
+  observation still fails it. `details` gained a machine-readable `blocking` list
+  of flag names so an agent branches without parsing prose. The max-observed rule
+  correctly reports every clause that binds when several do, and it will not name
+  a clause that some pair cleared (cod-7l0q).
+
+- A report field derived by sampling an unbounded input silently understates
+  when a single record overruns the sample. `digest.py` computed the analysis
+  window from the first and last 2,000 bytes of `git.log`, but the log is
+  reverse-chronological and this repo's initial commit carries a multi-kilobyte
+  numstat block, so the tail sample never reached the oldest entry's header and
+  the window collapsed onto a single day (thirteen actual days, seven active
+  dates). Two lessons: (1) anchor a scan on the record's fixed header
+  (`^--[0-9a-f]+--(YYYY-MM-DD)--`, from `codelens print-log-command`) rather than
+  a bare `\d{4}-\d{2}-\d{2}` that also matches a date inside a commit subject or
+  file path; (2) scan the whole log line-by-line, never a fixed-size end sample,
+  since entry size is unbounded. The regression test must push the oldest header
+  beyond BOTH the head and tail samples an end-sampler would read (a short newest
+  entry leaves the oldest header inside `text[:2000]` and the bug does not
+  reproduce). digest.py is python; `make build` gates only Go, so run its tests
+  with `uv run digest_test.py` in `docs/skills/codelens/scripts/` (cod-b9td).

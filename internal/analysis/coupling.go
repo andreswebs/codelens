@@ -3,6 +3,7 @@ package analysis
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/andreswebs/codelens/internal/analysis/calc"
 	"github.com/andreswebs/codelens/internal/analysis/couplingalgo"
@@ -76,18 +77,26 @@ func runCoupling(mods []model.Modification, opts Opts) (any, error) {
 	pairs := couplingalgo.Couplings(mods, opts.MaxChangesetSize)
 
 	rows := make([]couplingRow, 0, len(pairs))
-	maxDegree := 0
+	var blockers couplingBlockers
 	for _, p := range pairs {
 		avg := calc.Average(p.EntityRevs, p.CoupledRevs)
 		degree := calc.Percentage(float64(p.Shared) / avg)
+		avgRevs := calc.TruncInt(avg)
+		deg := calc.TruncInt(degree)
 
-		if d := calc.TruncInt(degree); d > maxDegree {
-			maxDegree = d
+		if deg > blockers.maxDegree {
+			blockers.maxDegree = deg
+		}
+		if p.Shared > blockers.maxSharedRevs {
+			blockers.maxSharedRevs = p.Shared
+		}
+		if avgRevs > blockers.maxAverageRevs {
+			blockers.maxAverageRevs = avgRevs
 		}
 
 		// within-threshold? takes the average revisions as its revs argument;
 		// floor(avg) equals the raw ratio for the inclusive >= min-revs check.
-		if !couplingalgo.WithinThreshold(calc.TruncInt(avg), p.Shared, degree, thresholds) {
+		if !couplingalgo.WithinThreshold(avgRevs, p.Shared, degree, thresholds) {
 			continue
 		}
 
@@ -120,16 +129,78 @@ func runCoupling(mods []model.Modification, opts Opts) (any, error) {
 	})
 
 	// Every candidate pair fell below the thresholds. The empty result is valid
-	// but reads as "no coupling"; warn with the highest degree actually seen so
-	// the operator can tell a threshold mismatch from a genuine absence.
+	// but reads as "no coupling"; attribute it to the threshold(s) that actually
+	// bound so the hint never sends a caller to a flag that excluded nothing.
 	if len(rows) == 0 && len(pairs) > 0 {
-		opts.warn(
-			"coupling_all_filtered",
-			"0 pairs met the coupling thresholds",
-			fmt.Sprintf("highest observed coupling was %d%%; lower --min-coupling (currently %d) to see weaker links", maxDegree, opts.MinCoupling),
-			map[string]any{"max_degree": maxDegree, "min_coupling": opts.MinCoupling, "candidate_pairs": len(pairs)},
-		)
+		emitCouplingFilteredWarning(opts, blockers, len(pairs))
 	}
 
 	return rows, nil
+}
+
+// couplingBlockers records the best value observed for each bounded quantity
+// across every candidate pair. Because the thresholds are a conjunction, a
+// quantity whose best observation still fails its threshold is one that bound the
+// whole result: naming it is what lets the caller lower the flag that actually
+// excluded the closest pairs, rather than one the highest observed value already
+// cleared.
+type couplingBlockers struct {
+	maxDegree      int
+	maxSharedRevs  int
+	maxAverageRevs int
+}
+
+// emitCouplingFilteredWarning raises coupling_all_filtered, attributing the empty
+// result to the threshold(s) no candidate pair could clear. It names every binding
+// threshold (a pair can fail several clauses at once) with its best observation so
+// a caller can compute a working value, and carries a machine-readable `blocking`
+// list so an agent can branch without parsing the prose hint.
+func emitCouplingFilteredWarning(opts Opts, b couplingBlockers, candidatePairs int) {
+	blocking := []string{}
+	var actions []string
+	if b.maxAverageRevs < opts.MinRevs {
+		blocking = append(blocking, "min-revs")
+		actions = append(actions, "lower --min-revs")
+	}
+	if b.maxSharedRevs < opts.MinSharedRevs {
+		blocking = append(blocking, "min-shared-revs")
+		actions = append(actions, "lower --min-shared-revs")
+	}
+	if b.maxDegree < opts.MinCoupling {
+		blocking = append(blocking, "min-coupling")
+		actions = append(actions, "lower --min-coupling")
+	}
+	if b.maxDegree > opts.MaxCoupling {
+		blocking = append(blocking, "max-coupling")
+		actions = append(actions, "raise --max-coupling")
+	}
+
+	hint := fmt.Sprintf(
+		"no candidate pair cleared every threshold; best observed: average revs %d (--min-revs %d), shared revs %d (--min-shared-revs %d), degree %d%% (--min-coupling %d, --max-coupling %d)",
+		b.maxAverageRevs, opts.MinRevs, b.maxSharedRevs, opts.MinSharedRevs, b.maxDegree, opts.MinCoupling, opts.MaxCoupling,
+	)
+	if len(actions) > 0 {
+		hint += "; " + strings.Join(actions, " and ")
+	}
+
+	opts.warn(
+		"coupling_all_filtered",
+		"0 pairs met the coupling thresholds",
+		hint,
+		map[string]any{
+			"candidate_pairs": candidatePairs,
+			"blocking":        blocking,
+			"observed": map[string]any{
+				"max_degree":       b.maxDegree,
+				"max_shared_revs":  b.maxSharedRevs,
+				"max_average_revs": b.maxAverageRevs,
+			},
+			"thresholds": map[string]any{
+				"min-revs":        opts.MinRevs,
+				"min-shared-revs": opts.MinSharedRevs,
+				"min-coupling":    opts.MinCoupling,
+				"max-coupling":    opts.MaxCoupling,
+			},
+		},
+	)
 }

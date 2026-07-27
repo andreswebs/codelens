@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":true,"analysis":"coupling","shape":"table","semantics":{"average_revs":"count","coupled":"filepath","degree":"percentage","entity":"filepath"},"params":{"max-changeset-size":30,"max-coupling":100,"min-coupling":30,"min-revs":5,"min-shared-revs":5,"verbose":false},"row_count":0,"rows":[]}
