@@ -11,9 +11,13 @@ tags: [codelens, spec-002, output, viz, deferred]
 ---
 # Epic: non-table shapes and downstream viz-spec adapters
 
-PARKED 2026-07-27. Nothing here is scheduled, and every item in "Open decisions" is
-deferred. Read "Two findings" first: they materially shrink what this epic is worth, and
-they are the reason two of its original shapes were dropped rather than built.
+PARKED 2026-07-27. Nothing here is scheduled. Read "Two findings" first: they materially
+shrink what this epic is worth, and they are the reason two of its original shapes were
+dropped rather than built.
+
+Adapter decisions A1 and A3 were answered later the same day and are marked ANSWERED inline
+under "Open decisions"; the epic remains parked, but the adapter half is no longer blocked on
+the shape half. See docs/specs/003-flint-adapter/plan.md.
 
 Follow-on to the spec-002 canonical-envelope rollout
 (docs/specs/002-data-output/plan.md), which shipped `shape`, `semantics`, and `transforms`.
@@ -83,10 +87,16 @@ significant code.
 2. How `semantics` describes a non-flat payload (see decision E3, the sharpest open item).
 3. The viz-spec adapters, and which existing scripts become thin adapters over them.
 
-## Open decisions (all deferred)
+## Open decisions
 
-None of these is settled. They are grouped by area; E for envelope, A for adapters, P for
-process.
+Grouped by area; E for envelope, A for adapters, P for process.
+
+A1 and A3 were ANSWERED on 2026-07-27 from a study of Flint's published docs and packages,
+and are marked inline below. Everything else is still open. The two answers do not unpark the
+epic, but they do change its shape: A1's finding that every Flint template consumes a flat
+row table means the ADAPTER work (A1-A4) no longer depends on the SHAPE work (E1-E9) in any
+way, so the adapter half can proceed alone. The first piece of it is scoped in
+docs/specs/003-flint-adapter/plan.md.
 
 ### Envelope and contract
 
@@ -126,19 +136,74 @@ process.
 
 ### Adapters
 
-- **A1. Is Flint still the target?** Verify the project's maturity and schema stability
-  before the skill commits to tracking an external schema. Then decide which analyses map to
-  which of its roughly 30 tabular chart types. Flint does NOT cover the hierarchical
-  (enclosure, treemap) or graph (coupling, communication) flagships, so those stay custom
-  either way.
+- **A1. Is Flint still the target? ANSWERED 2026-07-27: YES.** Microsoft, MIT, npm
+  `flint-chart` at 0.4.1, generated per-backend chart references, a live editor, an MCP
+  server, and an official authoring skill under `agent-skills/flint-chart-author`. Maturity
+  is adequate; stability is the caveat. 0.4.0 ADDED 38 Plotly chart types and 18 Excel
+  templates, so the template registry is actively growing. Track the SEMANTIC TYPE registry
+  rather than the template list: the semantic vocabulary is what codelens couples to, and it
+  is the more stable of the two.
+
+  THE SECOND HALF OF THIS DECISION AS ORIGINALLY WRITTEN IS WRONG, and the correction is the
+  most useful thing here. Flint's ECharts backend covers structures Vega-Lite lacks:
+  Treemap, Sunburst, Tree, Sankey, and Network Graph. So:
+
+  - The GRAPH flagships are covered properly. ECharts `Network Graph` takes encodings `x`,
+    `y`, `size`, which is source, target, weight: a FLAT EDGE TABLE, exactly what `coupling`
+    and `communication` already emit. Same for `pair_matrix.py` output, which is Flint's
+    `Heatmap`.
+  - The HIERARCHICAL flagships are NOT covered, but for a sharper reason than "Flint has no
+    treemap". It has one; `ChartEncoding.field` is a singular `string`, so one field binds
+    per channel and Treemap gets `color`, `size`, `detail` (Sunburst adds `group`). That is
+    one hierarchy level, two with Sunburst. A deep filesystem path cannot be expressed.
+    enclosure.py and treemap.py survive on those grounds, not on absence.
+
+  THE DECISIVE CONSEQUENCE FOR THIS EPIC: every Flint template, Network Graph included,
+  consumes a flat row table. A Flint adapter therefore needs NO new shape and can be built
+  today against `table`. A1-A4 are fully decoupled from E1-E9, which the closing note
+  allowed for but could not yet justify.
+
+  Language-lane findings, which are load-bearing for A4:
+
+  - `packages/flint-py` exists but is a SOURCE-ONLY PREVIEW ("PyPI publishing is planned for
+    a later release"), and PyPI has no `flint-chart` package (404 as of 2026-07-27).
+  - flint-py is the VEGA-LITE BACKEND ONLY. The ECharts-only templates, including the
+    Network Graph win above, are unreachable from Python.
+  - Therefore anything that COMPILES or RENDERS via ECharts needs the JS lane (Deno, per the
+    skill-builder self-contained-scripts convention) or the MCP server. Note that EMITTING a
+    `ChartAssemblyInput` needs no Flint dependency in any language: it is JSON construction.
+    That split is what the flint_spec.py plan is built on.
 - **A2. Which adapters get built, and which are dropped?** Candidates: Flint
   `ChartAssemblyInput`, Vega-Lite, GraphML/DOT, CodeCharta `.cc.json`. Each is permanent
   maintenance. Note CodeCharta wants per-file metrics, so it inherits finding 1's file-access
   dependency.
-- **A3. Do adapters replace or complement the existing renderers?** The five current scripts
-  emit FINISHED ARTIFACTS (HTML, SVG, PNG). Flint and Vega-Lite emit SPECS that still need a
-  renderer, so adopting them may ADD a step rather than remove one. Decide whether the skill
-  gains a spec lane alongside the artifact lane, or switches.
+- **A3. Do adapters replace or complement the existing renderers? ANSWERED 2026-07-27:
+  COMPLEMENT.** The skill gains a spec lane alongside the artifact lane; it does not switch.
+
+  The premise as written ("Flint and Vega-Lite emit SPECS that still need a renderer, so
+  adopting them may ADD a step") no longer holds, because `flint-chart-mcp` renders
+  in-process with no browser: Vega-Lite compiles to Vega and runs through a headless
+  `vega.View` to SVG, ECharts renders server-side to SVG, and PNG comes from
+  `@resvg/resvg-js`. Its five tools are `render_chart`, `compile_chart`, `validate_chart`,
+  `list_chart_types`, and `create_chart_view`. So in an agent context the spec lane REMOVES
+  the renderer rather than adding a step, and `validate_chart` additionally gives the skill
+  something the artifact lane never had: a machine check that a spec is well formed before
+  anything is drawn.
+
+  Complement rather than replace, for three independent reasons:
+
+  1. The hierarchical flagships cannot be expressed at all (see A1), so the artifact lane is
+     load-bearing regardless.
+  2. The MCP server is only available when an MCP client is attached. `run.bash` must keep
+     working headless, so the deterministic path cannot depend on it.
+  3. The existing scripts do work Flint has no notion of: glob filtering, the tokei
+     structure join, and the area-domination warning. Those are analysis concerns, not
+     chart-compilation concerns.
+
+  Practical consequence: rendering a spec has two paths, and the skill should document both
+  rather than pick one. MCP `render_chart` for interactive/agent use, and a self-contained
+  Deno script importing `npm:flint-chart-mcp/render` (`renderChart(input, 'echarts',
+  {format, scale})` is exported for exactly this) for the deterministic `run.bash` path.
 - **A4. Adapter CLI contract.** stdin envelope to stdout spec; one generic adapter driven by
   `semantics` versus one per analysis; location under docs/skills/codelens/scripts/; and test
   expectations, noting every existing script there has a `*_test.py`.
@@ -225,3 +290,7 @@ Reopen with 'tk reopen cod-304f' when any of these becomes true:
 The body above remains the authoritative record and needs no re-derivation: the settled decisions, the two findings with their measurements, and the numbered open decisions are all current as of closing. Per P1, consider promoting this to a docs/specs/003-* plan with its own decisions register rather than reopening it as a single epic, since the decision count rivals spec 002.
 
 Sequencing note: the shape enum trim (cod-2le4) lands first, so whoever reopens this starts from a two-member enum (table, text) and a payloadKey with no deferred-shape panic branch. E4 is written on that assumption.
+
+**2026-07-27T19:25:41Z**
+
+A1 and A3 ANSWERED 2026-07-27 and marked inline in the body; the epic stays parked. A1: Flint is still the target (Microsoft, MIT, npm flint-chart 0.4.1, MCP server, official authoring skill), but this decision's original claim that Flint covers neither the hierarchical nor the graph flagships is HALF WRONG. Its ECharts backend has Network Graph, whose encodings are x/y/size, i.e. a flat edge table that coupling and communication already emit; Heatmap likewise covers pair_matrix.py. Hierarchy genuinely is not covered, but because ChartEncoding.field is a singular string, so Treemap gets one level (Sunburst two) and a deep path cannot be expressed. DECISIVE CONSEQUENCE: every Flint template consumes a flat row table, so a Flint adapter needs no new shape and A1-A4 are fully decoupled from E1-E9. Lane findings: flint-py is a source-only preview, absent from PyPI, and Vega-Lite-only, so ECharts templates need the JS lane or MCP; emitting a ChartAssemblyInput needs no Flint dependency at all. A3: adapters COMPLEMENT the existing renderers. The premise that specs still need a renderer is obsolete because flint-chart-mcp renders in-process without a browser, so the spec lane removes a step in agent contexts and adds validate_chart as a pre-render check. Complement not replace because the hierarchical flagships are inexpressible, run.bash must work with no MCP client attached, and the existing scripts do glob filtering, the tokei join, and the area-domination warning, none of which is a chart concern.
