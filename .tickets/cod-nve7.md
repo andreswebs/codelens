@@ -1,6 +1,6 @@
 ---
 id: cod-nve7
-status: open
+status: closed
 deps: [cod-6kzk]
 links: []
 created: 2026-07-28T16:45:20Z
@@ -123,3 +123,9 @@ module docstring, matching how the Python scripts document theirs.
 - Exit codes consistent with the Python scripts: `0` ok, `2` usage.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T18:12:32Z**
+
+Added docs/skills/codelens/scripts/flint_render.ts (Deno, pinned npm:flint-chart-mcp@0.4.0/render) plus flint_render_test.ts (15 subprocess tests; run: deno test --allow-run --allow-read --allow-write --allow-env flint_render_test.ts). Renders SVG (default) and PNG (--scale) for vegalite and echarts; chartjs not offered. Backend inferred from Flint's template registries, vegalite preferred, --backend overrides (KPI Card is vegalite-only; Heatmap/Bar Chart exist on both). F12 layer 2 done via vl/ecGetTemplateChannels: undeclared channel or unknown chartType exits 2 naming the declared set. _warnings re-emitted: renderChart's result.warnings IS the assembled spec's _warnings (verified in package source), each emitted as a one-line JSON stderr diagnostic; test pins the overflow entry. Network Graph SVG byte-stable across processes (circular layout); NOT stable within one process (zrender id counters), so the golden test uses two invocations. All 6 override fixtures render. Gotcha for ticket 3 (run.bash): always pass --allow-env --allow-read --allow-sys --allow-ffi — vega-lite SVG output CHANGES if the ffi canvas module cannot load (silent text-metrics fallback); documented in the docstring. Exit codes 0/2; render errors caught, no stack traces. Learnings recorded in docs/specs/learnings.md.

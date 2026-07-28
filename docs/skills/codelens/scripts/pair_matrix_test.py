@@ -144,5 +144,55 @@ class TestEmpty(PairMatrixCase):
         self.assertEqual(rc, EXIT_EMPTY, msg=stderr)
 
 
+class TestAggregationGuard(PairMatrixCase):
+    """Involvement is a ranking key, so --weight-col may be intensive; it may not
+    be a non-measure. --schema is what makes either check live."""
+
+    ROWS = [
+        {"entity": "a/one.go", "coupled": "a/two.go", "degree": 78},
+        {"entity": "a/one.go", "coupled": "b/three.go", "degree": 62},
+    ]
+
+    SCHEMA: dict[str, Any] = {
+        "row_schema": [
+            {"name": "entity", "semantic": "filepath"},
+            {"name": "coupled", "semantic": "filepath"},
+            {"name": "degree", "semantic": "percentage"},
+        ],
+        "aggregation_roles": {"filepath": "dimension", "percentage": "intensive"},
+    }
+
+    def run_with_schema(
+        self, w: str, schema: object
+    ) -> tuple[int, str, dict[str, Any] | None, bool]:
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "schema.json"
+            path.write_text(json.dumps(schema), encoding="utf-8")
+            return self.run_pm(
+                self.ROWS, a="entity", b="coupled", w=w, extra=["--schema", str(path)]
+            )
+
+    def test_an_intensive_weight_is_permitted_and_unchanged(self) -> None:
+        rc, stderr, guarded, _ = self.run_with_schema("degree", self.SCHEMA)
+        self.assertEqual(rc, 0, msg=stderr)
+        _rc, _stderr, plain, _ = self.run_pm(
+            self.ROWS, a="entity", b="coupled", w="degree"
+        )
+        self.assertEqual(guarded, plain)
+
+    def test_a_dimension_weight_is_refused(self) -> None:
+        """A filepath cannot be ranked even ordinally, and the guard says so
+        instead of failing on a float() conversion."""
+        rc, stderr, _data, _ = self.run_with_schema("entity", self.SCHEMA)
+        self.assertEqual(rc, 2, msg=stderr)
+        self.assertIn("entity", stderr)
+        self.assertIn("dimension", stderr)
+
+    def test_an_unusable_schema_file_is_a_usage_error(self) -> None:
+        rc, stderr, _data, _ = self.run_with_schema("degree", {"not": "schema output"})
+        self.assertEqual(rc, 2, msg=stderr)
+        self.assertIn("row_schema", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

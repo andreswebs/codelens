@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // update, when set via `go test -update`, regenerates the golden files from the
@@ -61,7 +62,8 @@ type goldenCase struct {
 // Coverage spans every exit code the taxonomy lets codelens produce except 70
 // (unreachable from well-formed input; see the conformance guard):
 //
-//   - 0  the four authors success variants, the coupling warning, schema list
+//   - 0  the four authors success variants, the coupling warning, schema list,
+//     the two temporal-period scenarios
 //   - 64 the four usage errors, removed_format_flag, unknown_schema_command,
 //     invalid_after_date
 //   - 65 empty_log, invalid_control_char
@@ -146,7 +148,34 @@ func goldenCases(t *testing.T) []goldenCase {
 		// the three revision-detail columns, so the semantics map carries 7 entries,
 		// not the 4 of a plain coupling run.
 		{"coupling_verbose", []string{"coupling", "--verbose"}, weakCouplingLog(8, 2)},
+
+		// revisions_temporal (exit 0): --temporal-period on a non-changeset
+		// analysis with an additive column. The .err file is the point: it pins
+		// the temporal_period_recounts warning, naming the affected columns in
+		// details. No other golden exercises --temporal-period at all.
+		{"revisions_temporal", []string{"--temporal-period", "3", "revisions"}, dailyPairLog(8)},
+
+		// soc_temporal (exit 0): the negative assertion proving ChangesetBased
+		// works. sum-of-coupling reinterprets a revision as a logical change set
+		// by design, so the same transform must warn NOTHING (an empty .err).
+		{"soc_temporal", []string{"--temporal-period", "3", "sum-of-coupling"}, dailyPairLog(8)},
 	}
+}
+
+// dailyPairLog builds a git2+subject log where a.go and b.go co-change once per
+// day for `days` consecutive days starting 2024-01-01. Spreading the commits
+// over distinct days gives --temporal-period real windows to collapse: with
+// period 3 the pair appears in more overlapping windows than it has commits, so
+// a temporal run produces non-empty rows for both revisions (window counts) and
+// sum-of-coupling (per-window co-change gains above the default threshold).
+func dailyPairLog(days int) string {
+	var b strings.Builder
+	for i := 0; i < days; i++ {
+		date := time.Date(2024, 1, 1+i, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		fmt.Fprintf(&b, "--%07x--%s--Alice--c%d\n", i+1, date, i+1)
+		b.WriteString("1\t0\ta.go\n1\t0\tb.go\n\n")
+	}
+	return b.String()
 }
 
 // weakCouplingLog builds a git2+subject log where a.go and b.go co-change in

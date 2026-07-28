@@ -1,6 +1,6 @@
 ---
 id: cod-x0fv
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-28T16:24:56Z
@@ -125,3 +125,9 @@ change, no golden change. This is the property that makes the whole ticket safe.
   `-update`.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T17:21:31Z**
+
+Pure refactor done as specced. type Semantic string / type Shape string with typed constants in semantics.go/shape.go; type AggRole string declared in new internal/analysis/aggrole.go (constants, AggRoles(), ValidAggRole, AggRoleOf are ticket B / cod-eex1). Signature changes: Column.Semantic, Descriptor.Shape, CommandSchema.Shape, MetaSchema shape param, Semantics()/ValidSemantic/Shapes()/ValidShape, SemanticsOf -> map[string]Semantic. Boundary conversion in command layer: semanticsFor converts to map[string]string after adjustForTransforms (which is now typed); Result.Shape gets string(d.Shape). output still does not import analysis; output.Result.Shape/Semantics unchanged. All 18 descriptor files untouched (typed constants satisfy typed fields). Zero golden diffs; TestGolden passes without -update. One wrinkle: revive requires a doc comment on the exported const blocks once the original comment moved to the type declaration - added one-line block comments.

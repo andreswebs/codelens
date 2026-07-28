@@ -12,6 +12,9 @@ inter-cluster links is a coordination bottleneck.
 
 Usage:
   uv run scripts/dev_network.py --communication comm.json [--min-strength 25] -o network.html
+Optional: --schema FILE (`codelens schema --command communication` output)
+enables the aggregation guard on the node-size totals. Absent it they are
+computed unchecked; see aggregation.py.
 Exit codes: 0 ok; 2 usage; 3 empty.
 """
 
@@ -20,9 +23,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, NoReturn, cast
+
+from aggregation import AggregationError, combine_for_rank, roles_from_schema
 
 D3_CDN = '<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>'
 
@@ -70,22 +74,46 @@ def main() -> None:
     ap.add_argument(
         "--min-strength", type=float, default=0.0, help="drop links below this strength"
     )
+    ap.add_argument(
+        "--schema",
+        help="codelens schema --command communication output; enables the "
+        "aggregation guard on the node-size totals",
+    )
     ap.add_argument("--template", default=None)
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
 
-    links: list[dict[str, Any]] = []
-    strength_total: dict[str, float] = defaultdict(float)
-    for row in rows(args.communication):
-        s = float(row.get("strength", 0))
-        if s < args.min_strength:
-            continue
-        a, b = row["author"], row["peer"]
-        links.append({"source": a, "target": b, "value": s})
-        strength_total[a] += s
-        strength_total[b] += s
+    try:
+        roles = roles_from_schema(args.schema) if args.schema else {}
+    except AggregationError as e:
+        die(str(e), 2)
+
+    kept = [
+        row
+        for row in rows(args.communication)
+        if float(row.get("strength", 0)) >= args.min_strength
+    ]
+    links = [
+        {
+            "source": row["author"],
+            "target": row["peer"],
+            "value": float(row.get("strength", 0)),
+        }
+        for row in kept
+    ]
     if not links:
         die("no links above --min-strength", 3)
+
+    # combine_for_rank, not combine_for_value: `strength` is a percentage, and
+    # this total is weighted degree centrality feeding nodes[].val, a RADIUS.
+    # It is monotonic in both tie count and tie strength, which is what a node
+    # size should be, and no consumer reads its magnitude.
+    try:
+        strength_total = combine_for_rank(
+            kept, "strength", roles, lambda row: (row["author"], row["peer"])
+        )
+    except AggregationError as e:
+        die(str(e), 2)
 
     nodes = [
         {"id": nid, "val": round(v, 1)} for nid, v in sorted(strength_total.items())

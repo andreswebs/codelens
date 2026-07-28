@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":true,"analysis":"sum-of-coupling","shape":"table","semantics":{"entity":"filepath","soc":"count"},"transforms":{"temporal_period":3},"params":{"min-revs":5},"row_count":2,"rows":[{"entity":"b.go","soc":6},{"entity":"a.go","soc":6}]}

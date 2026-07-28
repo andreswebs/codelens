@@ -24,6 +24,7 @@ type schemaList struct {
 		ExitCode int    `json:"exit_code"`
 		Hint     string `json:"hint"`
 	} `json:"errors"`
+	AggregationRoles map[string]string `json:"aggregation_roles"`
 }
 
 // schemaCmd mirrors the `schema --command CMD` envelope the tests inspect.
@@ -45,9 +46,10 @@ type schemaCmd struct {
 		Semantic string `json:"semantic"`
 		Desc     string `json:"desc"`
 	} `json:"row_schema"`
-	ErrorCodes       []string `json:"error_codes"`
-	CommonErrorCodes []string `json:"common_error_codes"`
-	ExitCodes        []int    `json:"exit_codes"`
+	ErrorCodes       []string          `json:"error_codes"`
+	CommonErrorCodes []string          `json:"common_error_codes"`
+	ExitCodes        []int             `json:"exit_codes"`
+	AggregationRoles map[string]string `json:"aggregation_roles"`
 }
 
 func TestSchema_List(t *testing.T) {
@@ -80,6 +82,23 @@ func TestSchema_List(t *testing.T) {
 			if len(c.ExitCodes) == 0 {
 				t.Errorf("authors exit_codes empty, want the analysis set")
 			}
+		}
+	}
+
+	// The list form publishes the full semantic-to-role catalog: one entry per
+	// member of the closed semantic vocabulary. This is the wire-level
+	// exhaustiveness check the golden pins.
+	if len(list.AggregationRoles) != len(analysis.Semantics()) {
+		t.Errorf("aggregation_roles has %d entries, want %d", len(list.AggregationRoles), len(analysis.Semantics()))
+	}
+	for _, s := range analysis.Semantics() {
+		role, ok := list.AggregationRoles[string(s)]
+		if !ok {
+			t.Errorf("aggregation_roles missing semantic %q", s)
+			continue
+		}
+		if want := analysis.AggRoleOf(s); role != string(want) {
+			t.Errorf("aggregation_roles[%q] = %q, want %q", s, role, want)
 		}
 	}
 }
@@ -122,6 +141,18 @@ func TestSchema_Command_Authors(t *testing.T) {
 	}
 	if !equalInts(got.ExitCodes, []int{0, 64, 65, 70, 74}) {
 		t.Errorf("exit_codes = %v, want [0 64 65 70 74]", got.ExitCodes)
+	}
+
+	// The per-command form carries only the roles its own columns use: authors
+	// declares filepath (entity) and count (n_authors, n_revs) columns.
+	wantRoles := map[string]string{"filepath": "dimension", "count": "additive"}
+	if len(got.AggregationRoles) != len(wantRoles) {
+		t.Errorf("aggregation_roles = %v, want %v", got.AggregationRoles, wantRoles)
+	}
+	for s, r := range wantRoles {
+		if got.AggregationRoles[s] != r {
+			t.Errorf("aggregation_roles[%q] = %q, want %q", s, got.AggregationRoles[s], r)
+		}
 	}
 }
 
@@ -209,15 +240,37 @@ func TestSchema_Conformance(t *testing.T) {
 			if c.Name == "" || c.Type == "" || c.Desc == "" {
 				t.Errorf("%q: column %+v is not fully documented", d.Name, c)
 			}
-			if c.Semantic == "" || !analysis.ValidSemantic(c.Semantic) {
+			if c.Semantic == "" || !analysis.ValidSemantic(analysis.Semantic(c.Semantic)) {
 				t.Errorf("%q: column %q has semantic %q, not a member of %v", d.Name, c.Name, c.Semantic, analysis.Semantics())
 			}
 		}
 		if len(got.ExitCodes) == 0 {
 			t.Errorf("%q: exit_codes is empty", d.Name)
 		}
-		if !analysis.ValidShape(got.Shape) {
+		if !analysis.ValidShape(analysis.Shape(got.Shape)) {
 			t.Errorf("%q: shape %q is not a member of the closed set %v", d.Name, got.Shape, analysis.Shapes())
+		}
+
+		// aggregation_roles is exactly the roles of the DECLARED columns:
+		// every row_schema semantic (flag-gated included, since the schema
+		// declares the full untransformed vocabulary) is covered, and no
+		// semantic outside the declared set appears.
+		declared := map[string]bool{}
+		for _, c := range got.RowSchema {
+			declared[c.Semantic] = true
+			role, ok := got.AggregationRoles[c.Semantic]
+			if !ok {
+				t.Errorf("%q: aggregation_roles missing semantic %q (column %q)", d.Name, c.Semantic, c.Name)
+				continue
+			}
+			if want := analysis.AggRoleOf(analysis.Semantic(c.Semantic)); role != string(want) {
+				t.Errorf("%q: aggregation_roles[%q] = %q, want %q", d.Name, c.Semantic, role, want)
+			}
+		}
+		for s := range got.AggregationRoles {
+			if !declared[s] {
+				t.Errorf("%q: aggregation_roles has %q, not a declared column semantic", d.Name, s)
+			}
 		}
 	}
 }
@@ -237,7 +290,7 @@ func TestSchema_MetaShapes(t *testing.T) {
 		if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 			t.Fatalf("not a schema envelope: %v", err)
 		}
-		if got.Shape != analysis.ShapeText {
+		if analysis.Shape(got.Shape) != analysis.ShapeText {
 			t.Errorf("shape = %q, want %q", got.Shape, analysis.ShapeText)
 		}
 	})

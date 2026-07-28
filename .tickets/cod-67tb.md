@@ -1,6 +1,6 @@
 ---
 id: cod-67tb
-status: open
+status: closed
 deps: [cod-eex1]
 links: []
 created: 2026-07-28T16:50:08Z
@@ -107,3 +107,9 @@ no documented field.
   is a genuine wire-level exhaustiveness check.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T17:57:23Z**
+
+Implemented per spec 004 section 6.2/7.3. analysis.AggregationRoles() builds the full 12-entry semantic-to-role catalog from Semantics()+AggRoleOf so it cannot drift; rolesOfColumns(d.RowSchema) builds the per-command subset (all DECLARED columns, flag-gated included, since RowSchema already carries them; FlagGated is json:"-"). CommandList gains aggregation_roles after errors; CommandSchema gains it after row_schema; MetaSchema publishes an empty non-nil map that marshals as {}. Key name identical in both forms. Result envelope untouched, no schema_version bump. Tests: analysis-layer builder tests (subset incl. flag-gated, meta {}, list-form covers every member of Semantics()) plus command-layer wire tests: TestSchema_List asserts the 12-entry catalog on actual output, TestSchema_Conformance asserts every analysis's subset is exactly the roles of its declared column semantics (coverage + no extras). Golden diffs to schema_list.out and authors_schema.out reviewed: strictly additive. make build green. Note for cod-8579: one --schema file per command suffices for the Python guard, as planned.

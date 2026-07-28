@@ -20,6 +20,9 @@ A missing or empty file just omits its section. An optional git.log in the same
 directory is used only to report the analysis window's first and last dates.
 
 Input: a positional data directory. Output: -o FILE (default <dir>/digest.md).
+Optional: --schema FILE (`codelens schema --command absolute-churn` output)
+enables the aggregation guard on the churn totals, this digest's only value
+aggregation. Absent it those totals are computed unchecked; see aggregation.py.
 Exit codes: 0 ok; 2 usage/bad input; 3 nothing to digest (no analysis files).
 """
 
@@ -32,6 +35,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, NoReturn, cast
+
+from aggregation import AggregationError, Roles, combine_for_value, roles_from_schema
 
 EXIT_USAGE = 2
 EXIT_EMPTY = 3
@@ -91,8 +96,9 @@ def is_code(entity: str) -> bool:
     return NONCODE.search(entity) is None
 
 
-def build_digest(d: Path) -> list[str]:
-    """Build the digest lines for the analysis directory `d`."""
+def build_digest(d: Path, roles: Roles) -> list[str]:
+    """Build the digest lines for the analysis directory `d`. `roles` carries the
+    churn columns' aggregation roles, or is empty when --schema was not given."""
     out: list[str] = []
     w = out.append
 
@@ -144,6 +150,9 @@ def build_digest(d: Path) -> list[str]:
     code_md = [r for r in load_rows(d / "main-dev.json") if is_code(str(r["entity"]))]
     w("\n## ownership")
     if code_md:
+        # Counts files at full ownership rather than summing `ownership`: the
+        # tally is a count derived from a filter, not an aggregation of an
+        # intensive ratio, so no guard applies.
         owned100 = sum(1 for r in code_md if float(r.get("ownership", 0)) >= 0.999)
         w(f"- code files with a single 100%-owner: {owned100}/{len(code_md)}")
         top = Counter(str(r["main_dev"]) for r in code_md).most_common(8)
@@ -161,6 +170,8 @@ def build_digest(d: Path) -> list[str]:
     # --- code age ---
     age = [r for r in load_rows(d / "code-age.json") if is_code(str(r["entity"]))]
     if age:
+        # Order statistics over an intensive measure: legal unguarded, and the
+        # reason age is never totalled here.
         ages = sorted(int(r["age_months"]) for r in age)
         med = ages[len(ages) // 2]
         w("\n## code age (months since last change, code files)")
@@ -173,8 +184,10 @@ def build_digest(d: Path) -> list[str]:
     # --- churn ---
     ch = load_rows(d / "abs-churn.json")
     if ch:
-        tot_add = sum(int(r.get("added", 0)) for r in ch)
-        tot_del = sum(int(r.get("deleted", 0)) for r in ch)
+        # Reported totals, so combine_for_value: both columns are `loc`, hence
+        # additive, and the guard says so instead of leaving it to be inferred.
+        tot_add = int(combine_for_value(ch, "added", roles))
+        tot_del = int(combine_for_value(ch, "deleted", roles))
         spike = max(ch, key=lambda r: int(r.get("added", 0)) + int(r.get("deleted", 0)))
         ratio = f"{tot_add / tot_del:.2f}" if tot_del else "inf"
         w("\n## churn")
@@ -208,6 +221,11 @@ def main() -> None:
     )
     ap.add_argument("data_dir", help="directory of per-analysis codelens JSON files")
     ap.add_argument("-o", "--out", help="output file (default <data_dir>/digest.md)")
+    ap.add_argument(
+        "--schema",
+        help="codelens schema --command absolute-churn output; enables the "
+        "aggregation guard on the churn totals",
+    )
     args = ap.parse_args()
 
     d = Path(args.data_dir)
@@ -216,7 +234,11 @@ def main() -> None:
     if not any((d / name).is_file() for name in ANALYSIS_FILES):
         die(f"no analysis JSON found in {d}", EXIT_EMPTY)
 
-    lines = build_digest(d)
+    try:
+        roles = roles_from_schema(args.schema) if args.schema else {}
+        lines = build_digest(d, roles)
+    except AggregationError as e:
+        die(str(e), EXIT_USAGE)
     out = Path(args.out) if args.out else d / "digest.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {out} ({len(lines)} lines)", file=sys.stderr)

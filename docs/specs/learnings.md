@@ -1488,3 +1488,168 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   entry leaves the oldest header inside `text[:2000]` and the bug does not
   reproduce). digest.py is python; `make build` gates only Go, so run its tests
   with `uv run digest_test.py` in `docs/skills/codelens/scripts/` (cod-b9td).
+
+## Aggregation-role vocabulary + temporal-period warning (cod-eex1)
+
+- A new command-layer warning changes the stderr contract of every test that
+  asserts "empty stderr on success". Landing `temporal_period_recounts` broke
+  `TestE2E_Pipeline_Temporal`, whose `runAuthors` helper treats any stderr as a
+  failure; the fix was to drive that one run directly and assert the warning is
+  PRESENT, which strengthens the test (the goldens pin the full envelope, the
+  e2e pins that the code fires on the collapse scenario). When adding a
+  warning, grep the test tree for empty-stderr assertions on the paths that now
+  legitimately warn, and turn each into a positive assertion rather than
+  loosening the helper.
+- Descriptor-wide conformance tests cannot live in `internal/analysis`: its
+  registry tests call `resetRegistry()` and repopulate the process-global
+  registry with stubs, so an in-package test iterating `All()` sees whatever
+  ran before it. `internal/command` is where `All()` reflects the real init
+  registrations (`schema_test.go` already relies on this), so the
+  `ChangesetBased` conformance test lives there (`changeset_test.go`).
+
+## Flint spec adapter, flint_spec.py (cod-6kzk)
+
+- The plan's compiled-fixture rule (003 plan 3.4.1) caught a third silent
+  failure the plan itself had not recorded: the x/y array reshape only works
+  as a BARE array (`"y": ["added", "deleted"]`). Wrapping it in the canonical
+  object form (`{"field": [...]}`) throws `TypeError: name.replace is not a
+  function` inside `assembleVegaLite` at flint-chart@0.4.0. The emitter keeps
+  the object form for single fields and the bare array for multi-field binds,
+  and the absolute-churn fixture pins that asymmetry.
+- flint-chart's declared channel lists differ from the plan's seed table in
+  one place: vegalite `Bar Chart` also declares `opacity`. The channel table
+  in `flint_spec.py` carries the values measured live via
+  `vlGetTemplateChannels`/`ecGetTemplateChannels` at 0.4.0, not the plan's
+  transcription. When re-verifying on upgrade, read the lists from the
+  package, never from a document.
+- A KPI Card with N rows assembles to `vconcat[1]` holding an `hconcat` of N
+  cards (a grid), not `vconcat[N]`. A verifier asserting one vconcat entry
+  per row would fail on a correct spec; assert on the card content instead.
+- The measure-precedence interleave (proportion, then loc, then
+  duration_months, then count) is expressible over aggregation roles plus one
+  documented exception: duration_months is intensive but a magnitude, not a
+  proportion. No real analysis carries both loc and duration_months, so the
+  interleave never actually decides; the comment in `measure_rank` records
+  this so nobody "fixes" the ordering.
+- The emitted ChartAssemblyInput has no backend field, so the chosen backend
+  is reported on stderr (`emitted Network Graph (echarts) ...`). Ticket 2's
+  renderer and the run.bash wiring need that channel or an explicit
+  `--backend`; a renderer cannot infer the backend from chartType alone
+  (Heatmap exists on both).
+
+## Flint renderer, flint_render.ts (cod-nve7)
+
+- The `_warnings` obligation needs no second assembly pass:
+  `flint-chart-mcp@0.4.0/render`'s `assembleForBackend` reads the assembled
+  spec's private `_warnings` and returns it as the render result's `warnings`
+  (verified in the package source), so `renderChart(...).warnings` IS
+  `_warnings`. The renderer re-emits each entry as a one-line JSON diagnostic
+  on stderr, matching the codelens NDJSON warning shape.
+- Vega-Lite SVG output is PERMISSION-DEPENDENT under Deno. The render path
+  optionally imports `@napi-rs/canvas` for text metrics inside a try/catch;
+  without `--allow-ffi`/`--allow-sys` that import fails silently and vega
+  falls back to approximate metrics, producing a byte-different SVG (measured:
+  same spec, 6872 vs 6887 bytes, different hashes). One canonical flag set
+  (`--allow-env --allow-read --allow-sys --allow-ffi`) is documented in the
+  script docstring precisely so renders stay reproducible; PNG needs sys+ffi
+  anyway for the resvg native binding.
+- The ECharts Network Graph SVG is byte-stable ACROSS processes but not
+  within one: zrender's element-id counters increment per render in-process,
+  so two renderChart calls in the same process differ while one render per
+  invocation is identical every run. The determinism test therefore spawns
+  two processes; do not convert it to two in-process renders.
+- Backend resolution (the open question in the cod-6kzk note above): infer
+  from the template registries, vegalite preferred, with a `--backend`
+  override. Template-name overlap is larger than expected when picking test
+  fixtures: `Bar Chart`, `Heatmap`, and even `Pie Chart` exist on multiple
+  backends; `KPI Card` is vegalite-only at 0.4.0 and is the right fixture for
+  a backend-mismatch rejection test.
+- `renderChart` already rejects an undeclared channel when handed a backend
+  (its `prepareInput` checks the template), but as an uncaught throw. The
+  script still pre-checks via `vlGetTemplateChannels`/`ecGetTemplateChannels`
+  (F12 layer 2) and wraps the render in a try/catch, so every failure is a
+  one-line exit-2 diagnostic rather than a stack trace, matching the Python
+  siblings' silent posture.
+
+## Flint spec lane wired into the skill (cod-di2f)
+
+- The replaces/does-not-replace split belongs IN the catalog, not only in the
+  plan. Stating it once as a section ("Two lanes, and what each one draws") and
+  then giving every affected artifact-lane card a `Lane:` line that names the
+  spec-lane card replacing its chart body is what stops the catalog growing two
+  cards that disagree about how to draw the same chart. The two cards that are
+  explicitly NOT replaced (code-age map, fractal figures) need that stated as
+  loudly as the replacements, because "Flint has a treemap" reads as a
+  replacement until you know `ChartEncoding.field` is a singular string.
+- Spec-lane cards share more than they differ: schema capture, `--rows` over
+  Flint truncation, the deno invocation with its full permission set, and the
+  format list are identical for all eight. Written once in a section preamble
+  they stay consistent; repeated per card they would drift, and the permission
+  set is the one place drift silently changes output bytes.
+- Two analyses must NOT be bounded with `--rows`, and the reason is per-analysis
+  sort order rather than chart size: `absolute-churn` sorts by date ascending so
+  a cap drops the oldest end of the trend (bound the log window instead), and a
+  truncated `code-age` histogram is a misleading distribution. The general rule
+  "prefer --rows over Flint truncation" needs these two carve-outs stated or the
+  advice produces wrong charts.
+- A reference nothing links to is not part of the skill. `references/flint.md`
+  existed and was complete before this ticket, but neither SKILL.md nor
+  catalog.md pointed at it, so nothing routed a reader to either rendering path.
+  Wiring a new reference means editing the entry point too.
+- `flint_render_test.ts` needs `--allow-run` on top of the render permission
+  set (`--allow-env --allow-read --allow-sys --allow-ffi --allow-write`),
+  because it exercises the script as a spawned subprocess. Running it with only
+  the render flags fails all 15 tests with `NotCapable`, which looks like a code
+  regression and is not one.
+- Verifying the lane end to end on this repository needs a `tokei` stub (a
+  script emitting `{"Go":{"reports":[...]}}` from `git ls-files`) since
+  `run.bash` requires tokei on PATH, and a PATH built from symlinks minus `deno`
+  to exercise the no-Deno branch. Both branches behave: with deno the specs
+  render to `figs/flint-*.svg`, without it the specs still land in `flint/` and
+  every artifact-lane figure is unchanged. `coupling` and `communication` specs
+  fail here only because those analyses return zero rows at the default
+  thresholds (`coupling_all_filtered`); the artifact-lane figures fail on the
+  same data, so an empty spec-lane payload (exit 3) is a threshold result, not a
+  wiring fault.
+
+## Python aggregation guard and four retrofits (cod-8579)
+
+- "Computed output is unchanged" cannot be verified from a matplotlib SVG. Every
+  render embeds a fresh `<dc:date>` and fresh random element ids (`clip-path`,
+  `id="imageXXXX"`), so two byte-identical figures never diff clean. Compare
+  `pair_matrix.py --json-out` instead: it carries the ordered entities and the
+  matrix, which is the whole computed result. The same applies to any future
+  before/after check on the static figures.
+- The value/rank split fell out cleanly in code, but the two intents also want
+  different SHAPES, and that is the retrofit's one real design finding: every
+  value site here totals a column over all rows (a scalar), and every rank site
+  accumulates per key (a dict). So the helpers are `combine_for_value(rows, col,
+  roles) -> float` and `combine_for_rank(rows, col, roles, keys) ->
+  dict[str, float]` rather than one function with a grouping argument, which
+  would have returned a `float | dict` union and pushed a cast onto every
+  caller.
+- `combine_for_value` returns a float, so `digest.py` wraps it in `int()`. Skip
+  that and the digest prints `total_added=57749.0`. Exact for the int-valued
+  `loc` columns it totals, but it is a real edit the retrofit must not forget.
+- Guarding a column pays off before the values are even read. In
+  `pair_matrix.py` the involvement ranking had to move AHEAD of the weight
+  table, because `--weight-col entity` otherwise dies inside
+  `float('a/one.go')` with a traceback; with the guard first it exits 2 saying
+  the column's role is `dimension`. Order the guard before any conversion of
+  the column it guards.
+- The guard is only live if something passes `--schema`. `run.bash` now captures
+  the schemas once into `out/schema/` (the Flint lane's per-analysis capture was
+  repointed there rather than keeping two copies) and appends `--schema` to the
+  `pair_matrix.py` and `digest.py` invocations. The flags are appended to an
+  already-populated argument array, never expanded as a possibly-empty array of
+  their own, so nothing breaks under `set -o nounset` on bash 3.2; `local -n`
+  would have been the natural helper and needs bash 4.3.
+- `digest.py` reads a whole directory of analyses but has exactly one value
+  aggregation (the churn totals), so its `--schema` means the
+  `absolute-churn` schema specifically. Documented on the flag, because a
+  directory-shaped input with a single-command schema flag reads like a bug
+  otherwise.
+- `flint_spec.py` already carries a hardcoded `AGGREGATION_ROLES` table
+  (semantic -> role) with a self-consistency test, because it needs roles on
+  every invocation. The guard deliberately does NOT reuse or extend it: roles
+  come from `--schema` so there is no second copy of the vocabulary to drift.

@@ -121,11 +121,26 @@ Added-versus-deleted over time, at the project level. It is the macro backdrop f
 the business case: sustained one-sided growth is accumulation, and trends make
 waste visible far better than a snapshot.
 
+The same `absolute-churn` rows carry a commits count, and its month-by-month curve
+is the project's **momentum**. Bucket the daily rows into calendar months before
+reading (day-level counts are too noisy to show a shape; see the calendar rollup
+recipes in [operating.md](operating.md)). A decline sustained over
+6 to 12 months means the team is losing momentum; weigh every other finding
+against it, since a hotspot in a project shedding maintainers is a different risk
+than one under active development.
+
 ### Commit word cloud
 
 A **heuristic only** - a conversation starter, never a hard finding. Domain terms
 dominating is healthy; bug / crash / revert / bump dominating is a cue to drill
 deeper.
+
+The drill-down is `messages` with a crisis expression
+(`revert|hotfix|emergency|rollback`): the per-entity matches name where the
+firefighting lands, and the **cadence** of the matching commits is the trust
+signal - reverts every couple of weeks mean the team does not trust its deploy
+process. Read cadence alongside momentum: a firefighting spike on a declining
+commit curve is a team spending its remaining effort on repair.
 
 ### Summary tiles
 
@@ -144,6 +159,8 @@ Every number lives here, once, as a rule of thumb rather than a law.
 | Prioritization    | refactor down the ranked hotspot list; stop where the revision count levels off (power law)                                                                  |
 | Coupling floor    | file level `--min-coupling 30`; at the component level use ~20, where 22-28% is already meaningful                                                           |
 | Truck factor      | remove authors until >50% of files are abandoned; ~2/3 of projects are 1-2; ~41% survive the main dev leaving                                                |
+| Momentum          | a monthly commit-count curve declining for 6-12 months = the team is losing momentum                                                                         |
+| Crisis cadence    | reverts / hotfixes every couple of weeks = the team does not trust its deploy process                                                                        |
 | Business case     | healthy code ~124% faster to ship; unhealthy ~15x more defects and ~10x task-time variance; industry wastes 23-42% of dev time; ~15% baseline unplanned work |
 
 ## Guardrails for the social analyses

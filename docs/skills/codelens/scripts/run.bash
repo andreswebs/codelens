@@ -171,6 +171,41 @@ codelens parse "${WIN[@]}" >"${OUT}/parse.json" 2>/dev/null || true
 tokei --output json >"${OUT}/tokei.json" 2>/dev/null ||
     echo_stderr "[${REPO_NAME}] tokei failed"
 
+# Per-analysis schema, captured once for the scripts that aggregate rows: they
+# read its aggregation_roles map to check how a column may be combined (see
+# scripts/aggregation.py). Best effort, because the guard degrades to a
+# pass-through when a schema is unavailable; the flag is only added below when
+# the capture produced a file, so a failed capture never fails a figure.
+SCHEMA_DIR="${OUT}/schema"
+mkdir -p "${SCHEMA_DIR}"
+for analysis in coupling communication absolute-churn; do
+    codelens schema --command "${analysis}" >"${SCHEMA_DIR}/${analysis}.schema.json" \
+        2>/dev/null || echo_stderr "[${REPO_NAME}] schema ${analysis} failed"
+done
+
+# The guard's arguments are appended to an already-populated array rather than
+# expanded on their own, so every expansion below stays non-empty and safe under
+# `set -o nounset` on older bash.
+declare -a PM_COUPLING=(
+    --pairs "${OUT}/coupling.json" --a-col entity --b-col coupled --weight-col degree
+)
+if [[ -s "${SCHEMA_DIR}/coupling.schema.json" ]]; then
+    PM_COUPLING+=(--schema "${SCHEMA_DIR}/coupling.schema.json")
+fi
+
+declare -a PM_NETWORK=(
+    --pairs "${OUT}/communication.json" --a-col author --b-col peer
+    --weight-col strength --note 'coordination risk, not a performance ranking'
+)
+if [[ -s "${SCHEMA_DIR}/communication.schema.json" ]]; then
+    PM_NETWORK+=(--schema "${SCHEMA_DIR}/communication.schema.json")
+fi
+
+declare -a DIGEST=("${OUT}")
+if [[ -s "${SCHEMA_DIR}/absolute-churn.schema.json" ]]; then
+    DIGEST+=(--schema "${SCHEMA_DIR}/absolute-churn.schema.json")
+fi
+
 # Render one figure; figure scripts print progress to stderr on success, so
 # success is judged by exit code, never by stderr being empty.
 render_fig() {
@@ -187,11 +222,8 @@ render_fig knowledge treemap.py --weights "${OUT}/main-dev.json" --weight-col ma
     --categorical --structure "${OUT}/tokei.json" "${EXCLUDES[@]}" -o "${OUT}/figs/knowledge.svg"
 render_fig age treemap.py --weights "${OUT}/code-age.json" --weight-col age_months \
     --invert --structure "${OUT}/tokei.json" "${EXCLUDES[@]}" -o "${OUT}/figs/age.svg"
-render_fig coupling pair_matrix.py --pairs "${OUT}/coupling.json" --a-col entity \
-    --b-col coupled --weight-col degree -o "${OUT}/figs/coupling.svg"
-render_fig network pair_matrix.py --pairs "${OUT}/communication.json" --a-col author \
-    --b-col peer --weight-col strength \
-    --note 'coordination risk, not a performance ranking' -o "${OUT}/figs/network.svg"
+render_fig coupling pair_matrix.py "${PM_COUPLING[@]}" -o "${OUT}/figs/coupling.svg"
+render_fig network pair_matrix.py "${PM_NETWORK[@]}" -o "${OUT}/figs/network.svg"
 render_fig churn churn.py --churn "${OUT}/abs-churn.json" -o "${OUT}/figs/churn.svg"
 render_fig summary churn.py --summary "${OUT}/summary.json" -o "${OUT}/figs/summary.svg"
 render_fig fractal fractal.py --effort "${OUT}/effort.json" -o "${OUT}/figs/fractal.svg"
@@ -205,8 +237,67 @@ if [[ -n "${TOP}" && -f "${TOP}" ]]; then
     render_fig complexity complexity_trend.py --repo . --file "${TOP}" -o "${OUT}/figs/complexity.svg"
 fi
 
+# Flint spec lane (additive): emit a chart spec per analysis, then render it
+# headless when deno is on PATH. Without deno the specs still land in
+# ${OUT}/flint/ for the MCP rendering path, and everything above ran
+# unchanged. Each analysis's schema is captured into ${OUT}/schema/, the same
+# place the aggregation guard reads, so axis labels come from column
+# descriptions rather than raw column names.
+FLINT="${OUT}/flint"
+mkdir -p "${FLINT}"
+
+emit_spec() {
+    local name="${1}" analysis="${2}"
+    shift 2
+    codelens schema --command "${analysis}" >"${SCHEMA_DIR}/${analysis}.schema.json" \
+        2>"${FLINT}/${name}.stderr" &&
+        codelens "${analysis}" "${@}" 2>>"${FLINT}/${name}.stderr" |
+        uv run "${SCRIPT_DIR}/flint_spec.py" --schema "${SCHEMA_DIR}/${analysis}.schema.json" \
+            -o "${FLINT}/${name}.flint.json" 2>>"${FLINT}/${name}.stderr" ||
+        echo_stderr "[${REPO_NAME}] flint spec ${name} failed (see flint/${name}.stderr)"
+}
+
+# Bound the ranked edge tables with codelens --rows, never with Flint's canvas
+# budget: --rows truncates by the analysis's own ranking (a deliberate top-N,
+# coupling and communication sort by degree/strength descending), while Flint
+# truncates by axis sort order within a layout budget and self-labels the chart
+# "...N items omitted". absolute-churn sorts by date ascending, so --rows would
+# cut the oldest end of the trend; the --months window bounds it instead. The
+# code-age histogram and summary cards need every row (a distribution and a
+# handful of tiles), so they run unbounded.
+emit_spec coupling coupling "${WIN[@]}" "${EXCLUDES[@]}" --rows 100
+emit_spec network communication "${WIN[@]}" --rows 100
+emit_spec churn absolute-churn "${WIN[@]}" "${EXCLUDES[@]}"
+emit_spec summary summary "${WIN[@]}"
+emit_spec age code-age "${FULL[@]}" "${EXCLUDES[@]}"
+
+# Render each spec with the pinned Deno renderer. The backend is passed
+# explicitly because the spec does not carry one (flint_spec.py reports it
+# only on stderr) and Heatmap-style names exist on both backends. Always the
+# full permission set: vega-lite SVG output changes if the ffi canvas module
+# cannot load, so a reduced flag set silently breaks reproducibility.
+if command -v deno >/dev/null 2>&1; then
+    render_flint() {
+        local name="${1}" backend="${2}"
+        [[ -s "${FLINT}/${name}.flint.json" ]] || return 0
+        echo_stderr "  fig flint-${name}"
+        deno run --allow-env --allow-read --allow-sys --allow-ffi --allow-write \
+            "${SCRIPT_DIR}/flint_render.ts" --backend "${backend}" \
+            -o "${OUT}/figs/flint-${name}.svg" <"${FLINT}/${name}.flint.json" \
+            2>"${OUT}/figs/flint-${name}.stderr" ||
+            echo_stderr "[${REPO_NAME}] figure flint-${name} failed (see figs/flint-${name}.stderr)"
+    }
+    render_flint coupling echarts
+    render_flint network echarts
+    render_flint churn vegalite
+    render_flint summary vegalite
+    render_flint age vegalite
+else
+    echo_stderr "[${REPO_NAME}] deno not on PATH; Flint specs emitted to flint/, not rendered"
+fi
+
 # Compact per-analysis signal for grounding a findings write-up.
-uv run "${SCRIPT_DIR}/digest.py" "${OUT}" >/dev/null 2>&1 ||
+uv run "${SCRIPT_DIR}/digest.py" "${DIGEST[@]}" >/dev/null 2>&1 ||
     echo_stderr "[${REPO_NAME}] digest failed"
 
 echo_stderr "[${REPO_NAME}] done -> ${OUT}"

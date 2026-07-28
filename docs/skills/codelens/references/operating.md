@@ -181,7 +181,45 @@ Global flags that reshape the input before analysis. They run in a fixed order,
   repo `.mailmap` first. Feeds the communication network's Conway view.
 - `--temporal-period N`: collapse commits into sliding N-day change sets before
   analysis. Intended for coupling, where per-commit granularity is too narrow
-  across teams working in days or weeks.
+  across teams working in days or weeks. On any other analysis with count or
+  line-count columns, codelens warns on stderr (`temporal_period_recounts`)
+  that those columns tally overlapping windows rather than commits, naming the
+  affected columns in `details`.
+
+## Calendar rollups (downstream)
+
+Calendar bucketing is deliberately not an engine feature. The transforms above
+rewrite the input before analysis runs, which nothing downstream could do;
+rolling output rows up to months is a presentation step, so it stays in jq. Two
+recipes cover the temporal readings in
+[interpretation.md](interpretation.md); both bucket on `date[:7]`, the `YYYY-MM`
+prefix of the `date` semantic.
+
+Momentum (monthly commit and churn totals, from `absolute-churn`):
+
+```sh
+codelens absolute-churn --log git.log | jq '
+  .rows
+  | group_by(.date[:7])
+  | map({month: .[0].date[:7], commits: (map(.commits) | add),
+         added: (map(.added) | add), deleted: (map(.deleted) | add)})'
+```
+
+Crisis cadence (distinct crisis commits per month, from `parse`):
+
+```sh
+codelens parse --log git.log | jq '
+  [.rows[] | select(.message | test("revert|hotfix|emergency|rollback"; "i"))]
+  | group_by(.date[:7])
+  | map({month: .[0].date[:7], commits: ([.[].rev] | unique | length)})'
+```
+
+The source here must be `parse`, not `messages`: `parse` rows are one per
+entity-record and carry `rev`, `date`, and `message`, so distinct commits are
+recoverable (`unique` on `rev`); the `messages` analysis has already collapsed
+to per-entity match counts, which multi-count commits that touch several files
+and carry no dates. `parse` also emits the full message-bearing record stream,
+so the same shape adapts to any message-regex-over-time question.
 
 ## Authored-only run
 

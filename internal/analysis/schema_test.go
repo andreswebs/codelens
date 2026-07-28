@@ -225,6 +225,75 @@ func equalIntsA(a, b []int) bool {
 	return true
 }
 
+// TestSchema_AggregationRoles checks the per-command subset: every declared
+// column's semantic maps to its role, flag-gated columns included (the schema
+// declares the full untransformed vocabulary), and no other semantic appears.
+func TestSchema_AggregationRoles(t *testing.T) {
+	d := Descriptor{
+		Name:    "coupling",
+		Summary: "s",
+		Shape:   ShapeTable,
+		RowSchema: []Column{
+			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
+			{Name: "degree", Type: "int", Semantic: SemanticPercentage, Desc: "coupling strength"},
+			{Name: "average_revs", Type: "int", Semantic: SemanticCount, Desc: "avg revisions"},
+			{Name: "first_shared_rev", Type: "string", Semantic: SemanticCommitID, Desc: "detail", FlagGated: "verbose"},
+		},
+		ExitCodes: []int{0},
+	}
+	got := Schema(d).AggregationRoles
+	want := map[Semantic]AggRole{
+		SemanticFilepath:   AggDimension,
+		SemanticPercentage: AggIntensive,
+		SemanticCount:      AggAdditive,
+		SemanticCommitID:   AggIdentifier,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("AggregationRoles = %v, want %v", got, want)
+	}
+	for s, r := range want {
+		if got[s] != r {
+			t.Errorf("AggregationRoles[%q] = %q, want %q", s, got[s], r)
+		}
+	}
+}
+
+// TestMetaSchema_AggregationRoles ensures a meta command (no columns) carries an
+// empty non-nil map that marshals as {} rather than null, matching how its
+// row_schema marshals as [].
+func TestMetaSchema_AggregationRoles(t *testing.T) {
+	got := MetaSchema("schema", "s", "", nil, nil, []int{0})
+	if got.AggregationRoles == nil {
+		t.Error("AggregationRoles is nil, want empty non-nil map")
+	}
+	b, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(m["aggregation_roles"]) != "{}" {
+		t.Errorf("aggregation_roles = %s, want {}", m["aggregation_roles"])
+	}
+}
+
+// TestList_AggregationRoles_FullCatalog is the wire-level exhaustiveness check:
+// the list form publishes the role of every member of Semantics(), so a
+// thirteenth semantic cannot land without extending the published catalog.
+func TestList_AggregationRoles_FullCatalog(t *testing.T) {
+	list := List(nil, nil)
+	if len(list.AggregationRoles) != len(Semantics()) {
+		t.Errorf("AggregationRoles has %d entries, want %d", len(list.AggregationRoles), len(Semantics()))
+	}
+	for _, s := range Semantics() {
+		if got := list.AggregationRoles[s]; got != AggRoleOf(s) {
+			t.Errorf("AggregationRoles[%q] = %q, want %q", s, got, AggRoleOf(s))
+		}
+	}
+}
+
 // TestList_MergesAndSorts checks the command list combines the passed analysis
 // descriptors with extra (meta) summaries and orders every entry by name.
 func TestList_MergesAndSorts(t *testing.T) {

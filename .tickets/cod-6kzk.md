@@ -1,6 +1,6 @@
 ---
 id: cod-6kzk
-status: open
+status: closed
 deps: [cod-eex1]
 links: []
 created: 2026-07-28T16:43:35Z
@@ -222,3 +222,9 @@ Python compile stays possible on the default path.
 - `flint_spec_test.py` beside it, matching the other five scripts. `ruff` clean.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T17:52:17Z**
+
+Added docs/skills/codelens/scripts/flint_spec.py (stdlib-only, PEP 723, uv run) plus flint_spec_test.py (42 tests). Reads a table envelope on stdin, emits a Flint ChartAssemblyInput on stdout/-o; exit 0/2/3 per the scripts' taxonomy. Implements the 3.1 gate (rejects text/error/schema/parse, exit 2; empty exit 3), the 12->9 semantic map with percentage BARE and ratio intrinsicDomain [0,1] (regression-tested), the role-based generic channel policy, the 6 overrides, the F12 channel table (measured live: vegalite Bar Chart also declares opacity, beyond the plan's seed), --schema -> field_display_names with graceful degradation, --chart-type/--backend (incl. Heatmap/Lollipop/normalized Stacked Bar secondaries; stacked+color => stackMode normalize), --width/--height -> baseSize. All 10 fixture specs (6 overrides + 4 secondaries) compile-verified under deno run npm:flint-chart@0.4.0 with every channel surviving; also verified end-to-end on this repo's real git log (coupling -> 35-node/129-link circular graph). NEW FINDING for ticket 2 (flint_render.ts): the x/y array reshape must be a BARE array; {"field": [...]} throws at assembly. Also: ChartAssemblyInput carries no backend, so the chosen backend is only on the script's stderr summary; run.bash/renderer wiring (cod-di2f, cod-nve7) must pass or parse it. Details in docs/specs/learnings.md.

@@ -32,6 +32,15 @@ reproducible while the reading stays a matter of judgment
    To render by hand instead, run `treemap.py` for the enclosure family,
    `pair_matrix.py` for coupling and communication, and the static charts, writing
    the conventional stems below. A missing figure just omits its picture.
+
+   `run.bash` also captures each analysis's `codelens schema --command CMD` output
+   under `out/schema/`, and passes it as `--schema` to the scripts that combine
+   rows (`digest.py`, `pair_matrix.py`; `dev_network.py` takes it too). Those
+   scripts read the schema's `aggregation_roles` map to check how a column may be
+   combined: a total that gets reported refuses an intensive column such as
+   `degree` or `strength`, while a total used only to rank permits one. The flag
+   is optional and the check degrades to a pass-through without it, so a
+   hand-rendered figure still works unchecked; pass it to get the check.
 2. Write the findings file (below), one prose block per analysis, grounded in
    `out/digest.md`: a compact per-analysis signal (hotspots split code vs
    docs/config, coupling, ownership, fragmentation, age, churn, vocabulary) that

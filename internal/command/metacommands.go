@@ -20,7 +20,7 @@ type metaCommand struct {
 	// print-log-command declares analysis.ShapeText so an agent learns its stdout
 	// is a bare command line, not JSON; schema declares "" because its stdout is an
 	// introspection envelope, not an analysis result.
-	Shape string
+	Shape analysis.Shape
 	Flags []analysis.Flag // declared in the analysis.Flag shape; reused by toCLIFlag
 	// ErrorCodes lists only the terr codes DISTINCTIVE to this meta command,
 	// beyond the common baseline every command reports as a schema's

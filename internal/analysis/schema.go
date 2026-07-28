@@ -71,10 +71,18 @@ type CommandSchema struct {
 	// Shape names the topology of this command's payload (see Shapes). Omitted
 	// when empty: the schema command declares no shape because its output is an
 	// introspection envelope, not an analysis result.
-	Shape      string   `json:"shape,omitempty"`
-	Flags      []Flag   `json:"flags"`
-	RowSchema  []Column `json:"row_schema"`
-	ErrorCodes []string `json:"error_codes"`
+	Shape     Shape    `json:"shape,omitempty"`
+	Flags     []Flag   `json:"flags"`
+	RowSchema []Column `json:"row_schema"`
+	// AggregationRoles maps each semantic used by this command's DECLARED
+	// columns (flag-gated ones included, since the schema describes the full
+	// untransformed vocabulary) to its aggregation role. It is a map keyed by
+	// semantic, not a per-column field, so the per-semantic fact is stated once
+	// and a consumer joins on row_schema[].semantic. The key name matches the
+	// command list's full catalog because the content is identical, differing
+	// only in scope.
+	AggregationRoles map[Semantic]AggRole `json:"aggregation_roles"`
+	ErrorCodes       []string             `json:"error_codes"`
 	// CommonErrorCodes lists the codes any invocation of this tool can produce
 	// (input, option, and output-layer failures), declared once at tool level.
 	// ErrorCodes carries only the codes distinctive to this command, so an agent
@@ -114,6 +122,13 @@ type CommandList struct {
 	// reported per command via CommonErrorCodes, not here. Sorted by code for a
 	// stable envelope, since registration order is not a contract.
 	Errors []SchemaError `json:"errors"`
+	// AggregationRoles is the full semantic-to-role catalog, one entry per
+	// member of the closed semantic vocabulary (see AggregationRoles()). Its
+	// golden pins all twelve semantics, so a thirteenth cannot land without
+	// updating the published catalog: the map is the wire-level exhaustiveness
+	// check. It mirrors how error codes are published (a global inventory here,
+	// a per-command subset in CommandSchema).
+	AggregationRoles map[Semantic]AggRole `json:"aggregation_roles"`
 }
 
 // Schema builds the full schema object for descriptor d. Slice fields are
@@ -129,6 +144,7 @@ func Schema(d Descriptor) CommandSchema {
 		Shape:            d.Shape,
 		Flags:            nonNilFlags(d.Flags),
 		RowSchema:        nonNilColumns(d.RowSchema),
+		AggregationRoles: rolesOfColumns(d.RowSchema),
 		ErrorCodes:       nonNilStrings(d.ErrorCodes),
 		CommonErrorCodes: CommonErrorCodes(),
 		ExitCodes:        nonNilInts(d.ExitCodes),
@@ -143,7 +159,7 @@ func Schema(d Descriptor) CommandSchema {
 // shape is passed as-is: print-log-command declares ShapeText, while schema
 // declares "" (it is the introspection surface, not an analysis result) so the
 // omitempty key is absent from its schema. Analyses use Schema(d) instead.
-func MetaSchema(command, summary, shape string, flags []Flag, errorCodes []string, exitCodes []int) CommandSchema {
+func MetaSchema(command, summary string, shape Shape, flags []Flag, errorCodes []string, exitCodes []int) CommandSchema {
 	return CommandSchema{
 		SchemaVersion:    output.SchemaVersion,
 		OK:               true,
@@ -153,6 +169,7 @@ func MetaSchema(command, summary, shape string, flags []Flag, errorCodes []strin
 		Shape:            shape,
 		Flags:            nonNilFlags(flags),
 		RowSchema:        []Column{},
+		AggregationRoles: map[Semantic]AggRole{},
 		ErrorCodes:       nonNilStrings(errorCodes),
 		CommonErrorCodes: CommonErrorCodes(),
 		ExitCodes:        nonNilInts(exitCodes),
@@ -176,10 +193,11 @@ func List(analyses []Descriptor, extra []CommandSummary) CommandList {
 	sort.Slice(commands, func(i, j int) bool { return commands[i].Name < commands[j].Name })
 
 	return CommandList{
-		SchemaVersion: output.SchemaVersion,
-		OK:            true,
-		Commands:      commands,
-		Errors:        errorInventory(),
+		SchemaVersion:    output.SchemaVersion,
+		OK:               true,
+		Commands:         commands,
+		Errors:           errorInventory(),
+		AggregationRoles: AggregationRoles(),
 	}
 }
 
@@ -205,6 +223,23 @@ func summaryOf(d Descriptor) CommandSummary {
 		Summary:   d.Summary,
 		ExitCodes: nonNilInts(d.ExitCodes),
 	}
+}
+
+// rolesOfColumns maps each distinct semantic among the declared columns to its
+// aggregation role: the per-command subset of the full catalog. All declared
+// columns count, flag-gated ones included, because the schema describes the
+// command's full untransformed vocabulary (the envelope's semantics describe a
+// run). A semantic with no role (possible only for a descriptor bypassing the
+// conformance test, e.g. a test fixture) is skipped rather than published as an
+// empty role.
+func rolesOfColumns(cols []Column) map[Semantic]AggRole {
+	m := make(map[Semantic]AggRole, len(cols))
+	for _, c := range cols {
+		if r := AggRoleOf(c.Semantic); r != "" {
+			m[c.Semantic] = r
+		}
+	}
+	return m
 }
 
 func nonNilStrings(s []string) []string {

@@ -38,6 +38,16 @@ sidecars, formats, and how to read the result).
 | Is this hotspot deteriorating?   | Complexity trend      | none (live repo)                                 | `complexity_trend.py` | no          |
 | What is the headline?            | Summary tiles         | `summary`                                        | `churn.py --summary`  | no          |
 
+Those ten rows are the **artifact lane**: each script writes a finished HTML, SVG,
+or PNG file and needs only `uv`. A second lane, `flint_spec.py`, writes a Flint
+chart _spec_ that a downstream renderer (Deno, or the flint-chart MCP server) turns
+into SVG or PNG. It draws the edge tables, the churn trend, the summary tiles, the
+code-age distribution, and three charts the artifact lane has no counterpart for.
+The lanes coexist: the hierarchical maps and the word cloud cannot be expressed in
+Flint at all. Which lane draws what is settled in
+[catalog.md](references/catalog.md#two-lanes-and-what-each-one-draws); the two
+rendering paths are in [flint.md](references/flint.md).
+
 ### 2. Collect the data
 
 Generate a compatible log and run the chosen analysis:
@@ -81,6 +91,10 @@ uv run scripts/enclosure.py --weights data.json --structure tokei.json -o hotspo
 - **Interactive** (enclosure, coupling, network): the script writes an `.html`
   file (D3 from a CDN, data inlined) for live viewing and iframe embedding. These
   are not exported to static images.
+- **Spec lane** (`flint_spec.py`): the spec is not an artifact. Render it with
+  `flint_render.ts` under Deno for SVG or PNG, or hand it to the flint-chart MCP
+  server; [flint.md](references/flint.md) has both invocations, the permission
+  flags Deno needs, and the MCP stdio config.
 
 Target mechanics (inline SVG, iframe) are in [embedding.md](references/embedding.md).
 
@@ -109,7 +123,9 @@ grounding `digest.md` in one command; write a findings file (your reading of eac
 analysis, per [interpretation.md](references/interpretation.md), grounded in the
 digest); and run the assembler. It pins the investigative sequence, embeds the
 figures inline as SVG, and always emits the social-analysis guardrails. See
-[reporting.md](references/reporting.md).
+[reporting.md](references/reporting.md). `run.bash` also emits the spec lane
+additively - specs into `OUT/flint/`, and `OUT/figs/flint-*.svg` when `deno` is on
+PATH - so a run without Deno produces exactly what it always did.
 
 **Done when:** `report.py` exits `0` and `report.md` carries every section with its
 findings and figures.

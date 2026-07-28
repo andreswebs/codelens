@@ -13,7 +13,7 @@ func TestValidShape(t *testing.T) {
 	// implements the graph shape must remove "graph" from this negative list in
 	// the same change that declares it (see ADR 0008), rather than being confused
 	// by a test that appears to forbid their new shape.
-	for _, s := range []string{"", "rows", "TABLE", "unknown", "tree", "graph", "matrix", "series"} {
+	for _, s := range []Shape{"", "rows", "TABLE", "unknown", "tree", "graph", "matrix", "series"} {
 		if ValidShape(s) {
 			t.Errorf("ValidShape(%q) = true, want false", s)
 		}
@@ -21,7 +21,7 @@ func TestValidShape(t *testing.T) {
 }
 
 func TestShapes_Closed(t *testing.T) {
-	want := []string{"table", "text"}
+	want := []Shape{ShapeTable, ShapeText}
 	got := Shapes()
 	if len(got) != len(want) {
 		t.Fatalf("Shapes() = %v, want %v", got, want)

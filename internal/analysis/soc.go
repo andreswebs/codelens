@@ -35,9 +35,10 @@ func socDescriptor() Descriptor {
 			{Name: "entity", Type: "string", Semantic: SemanticFilepath, Desc: "module path"},
 			{Name: "soc", Type: "int", Semantic: SemanticCount, Desc: "number of shared transactions"},
 		},
-		ErrorCodes: []string{"empty_log"},
-		ExitCodes:  []int{0, 64, 65, 70, 74},
-		Run:        runSoc,
+		ChangesetBased: true,
+		ErrorCodes:     []string{"empty_log"},
+		ExitCodes:      []int{0, 64, 65, 70, 74},
+		Run:            runSoc,
 	}
 }
 

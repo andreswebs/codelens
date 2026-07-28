@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":true,"analysis":"revisions","shape":"table","semantics":{"entity":"filepath","n_revs":"count"},"transforms":{"temporal_period":3},"row_count":2,"rows":[{"entity":"a.go","n_revs":6},{"entity":"b.go","n_revs":6}]}

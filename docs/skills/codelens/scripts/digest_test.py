@@ -30,10 +30,15 @@ EXIT_EMPTY = 3
 
 class DigestCase(unittest.TestCase):
     def run_digest(
-        self, files: dict[str, object], *, git_log: str | None = None
+        self,
+        files: dict[str, object],
+        *,
+        git_log: str | None = None,
+        schema: object | None = None,
     ) -> tuple[int, str, str]:
         """Write each `name -> rows` as an envelope JSON into a temp dir, run
-        digest.py, and return (rc, stderr, digest_markdown)."""
+        digest.py, and return (rc, stderr, digest_markdown). `schema` is written
+        beside them and passed as --schema."""
         with tempfile.TemporaryDirectory() as d:
             dp = Path(d)
             for name, rows in files.items():
@@ -41,11 +46,12 @@ class DigestCase(unittest.TestCase):
             if git_log is not None:
                 (dp / "git.log").write_text(git_log, encoding="utf-8")
             out = dp / "digest.md"
-            proc = subprocess.run(
-                [sys.executable, str(SCRIPT), str(dp), "-o", str(out)],
-                capture_output=True,
-                text=True,
-            )
+            argv = [sys.executable, str(SCRIPT), str(dp), "-o", str(out)]
+            if schema is not None:
+                schema_file = dp / "schema.json"
+                schema_file.write_text(json.dumps(schema), encoding="utf-8")
+                argv += ["--schema", str(schema_file)]
+            proc = subprocess.run(argv, capture_output=True, text=True)
             md = out.read_text(encoding="utf-8") if out.is_file() else ""
             return proc.returncode, proc.stderr, md
 
@@ -228,6 +234,57 @@ class TestExitCodes(DigestCase):
             text=True,
         )
         self.assertEqual(proc.returncode, EXIT_USAGE, msg=proc.stderr)
+
+
+class TestChurnAggregationGuard(DigestCase):
+    """The churn totals go through combine_for_value; --schema is what makes that
+    check live (see aggregation.py)."""
+
+    CHURN = [
+        {"date": "2026-01-01", "added": 10, "deleted": 4, "commits": 2},
+        {"date": "2026-01-02", "added": 5, "deleted": 1, "commits": 1},
+    ]
+
+    def churn_schema(self, added_semantic: str) -> dict[str, object]:
+        return {
+            "row_schema": [
+                {"name": "date", "semantic": "date"},
+                {"name": "added", "semantic": added_semantic},
+                {"name": "deleted", "semantic": "loc"},
+            ],
+            "aggregation_roles": {
+                "date": "dimension",
+                "loc": "additive",
+                "percentage": "intensive",
+            },
+        }
+
+    def test_totals_are_unchanged_by_the_guard(self) -> None:
+        expected = "total_added=15 total_deleted=5"
+        _rc, _stderr, without = self.run_digest({"abs-churn.json": self.CHURN})
+        rc, stderr, with_schema = self.run_digest(
+            {"abs-churn.json": self.CHURN}, schema=self.churn_schema("loc")
+        )
+        self.assertEqual(rc, 0, msg=stderr)
+        self.assertIn(expected, without)
+        self.assertIn(expected, with_schema)
+
+    def test_an_intensive_churn_column_is_refused(self) -> None:
+        """Wiring proof: were `added` ever reclassified as a percentage, the
+        digest would refuse to report a total rather than print a wrong one."""
+        rc, stderr, _md = self.run_digest(
+            {"abs-churn.json": self.CHURN}, schema=self.churn_schema("percentage")
+        )
+        self.assertEqual(rc, EXIT_USAGE)
+        self.assertIn("added", stderr)
+        self.assertIn("intensive", stderr)
+
+    def test_an_unusable_schema_file_is_a_usage_error(self) -> None:
+        rc, stderr, _md = self.run_digest(
+            {"abs-churn.json": self.CHURN}, schema={"not": "schema output"}
+        )
+        self.assertEqual(rc, EXIT_USAGE)
+        self.assertIn("row_schema", stderr)
 
 
 if __name__ == "__main__":

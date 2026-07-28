@@ -82,7 +82,22 @@ func TestE2E_Pipeline_Temporal(t *testing.T) {
 		t.Fatalf("baseline = %+v, want 2 authors / 2 revs before collapsing", base.Rows[0])
 	}
 
-	env := runAuthors(t, log, "--temporal-period", "1")
+	// The temporal run is driven directly rather than through runAuthors: its
+	// stderr is legitimately non-empty, because authors is not changeset-based
+	// and carries additive columns, so the run must raise
+	// temporal_period_recounts (the goldens pin the full envelope).
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"authors", "--temporal-period", "1"}, Deps{In: strings.NewReader(log), Out: &stdout, Err: &stderr})
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr:\n%s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), `"code":"temporal_period_recounts"`) {
+		t.Errorf("stderr should carry the temporal_period_recounts warning, got:\n%s", stderr.String())
+	}
+	var env authorsEnvelope
+	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
+		t.Fatalf("stdout is not a JSON envelope: %v\n%s", err, stdout.String())
+	}
 
 	if env.RowCount != 1 || len(env.Rows) != 1 {
 		t.Fatalf("row_count=%d rows=%d, want 1/1", env.RowCount, len(env.Rows))

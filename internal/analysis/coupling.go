@@ -54,9 +54,10 @@ func couplingDescriptor() Descriptor {
 			{Name: "second_entity_revisions", Type: "int", Semantic: SemanticCount, Desc: "revisions of coupled (--verbose only)", FlagGated: "verbose"},
 			{Name: "shared_revisions", Type: "int", Semantic: SemanticCount, Desc: "revisions both changed in (--verbose only)", FlagGated: "verbose"},
 		},
-		ErrorCodes: []string{"empty_log"},
-		ExitCodes:  []int{0, 64, 65, 70, 74},
-		Run:        runCoupling,
+		ChangesetBased: true,
+		ErrorCodes:     []string{"empty_log"},
+		ExitCodes:      []int{0, 64, 65, 70, 74},
+		Run:            runCoupling,
 	}
 }
 

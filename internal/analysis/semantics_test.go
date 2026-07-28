@@ -8,7 +8,7 @@ func TestValidSemantic(t *testing.T) {
 			t.Errorf("ValidSemantic(%q) = false, want true for a declared semantic", s)
 		}
 	}
-	for _, s := range []string{"", "string", "FILEPATH", "team", "unknown"} {
+	for _, s := range []Semantic{"", "string", "FILEPATH", "team", "unknown"} {
 		if ValidSemantic(s) {
 			t.Errorf("ValidSemantic(%q) = true, want false", s)
 		}
@@ -16,7 +16,7 @@ func TestValidSemantic(t *testing.T) {
 }
 
 func TestSemantics_Closed(t *testing.T) {
-	want := []string{
+	want := []Semantic{
 		"filepath", "person", "date", "commit_id", "text", "label",
 		"flag", "count", "loc", "percentage", "ratio", "duration_months",
 	}

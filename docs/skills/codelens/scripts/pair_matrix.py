@@ -21,6 +21,10 @@ For the communication network, pass a --note carrying the guardrail framing
 (coordination risk, aggregate to teams; never a performance ranking). See
 references/interpretation.md.
 
+Optional: --schema FILE (`codelens schema --command CMD` output for the analysis
+being plotted) enables the aggregation guard on the involvement ranking. Absent
+it the ranking is computed unchecked; see aggregation.py.
+
 Exit codes: 0 ok; 2 usage/bad input; 3 empty result.
 """
 
@@ -29,9 +33,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, NoReturn, cast
+
+from aggregation import AggregationError, Roles, combine_for_rank, roles_from_schema
 
 
 def die(msg: str, code: int) -> NoReturn:
@@ -52,22 +57,38 @@ def load_rows(path: str) -> list[dict[str, Any]]:
 
 
 def build_matrix(
-    rows: list[dict[str, Any]], a_col: str, b_col: str, w_col: str, top: int
+    rows: list[dict[str, Any]],
+    a_col: str,
+    b_col: str,
+    w_col: str,
+    top: int,
+    roles: Roles,
 ) -> tuple[list[str], list[list[float]]]:
     """Return (ordered entities, symmetric weight matrix) for the top-N entities by
     total involvement. Entities tie-break by name for determinism."""
-    weight: dict[tuple[str, str], float] = {}
-    involvement: dict[str, float] = defaultdict(float)
-    for r in rows:
-        a, b = r.get(a_col), r.get(b_col)
-        if a is None or b is None or w_col not in r:
-            continue
-        w = float(r[w_col])
-        weight[(a, b)] = w
-        involvement[a] += w
-        involvement[b] += w
+    complete = [
+        r
+        for r in rows
+        if r.get(a_col) is not None and r.get(b_col) is not None and w_col in r
+    ]
+    # combine_for_rank, not combine_for_value: --weight-col is a percentage
+    # (degree or strength), and this total only SELECTS which entities appear,
+    # via sorted(...)[:top]. It is never rendered; the matrix shows per-pair
+    # weights, not involvement. Runs before the weight table so an unusable
+    # --weight-col is reported as such rather than as a float() failure.
+    involvement = combine_for_rank(
+        complete,
+        w_col,
+        roles,
+        lambda r: (cast("str", r[a_col]), cast("str", r[b_col])),
+    )
     if not involvement:
         die(f"no rows carried columns {a_col!r}, {b_col!r}, {w_col!r}", 3)
+
+    weight: dict[tuple[str, str], float] = {
+        (cast("str", r[a_col]), cast("str", r[b_col])): float(r[w_col])
+        for r in complete
+    }
 
     ordered = sorted(involvement, key=lambda e: (-involvement[e], e))[:top]
     idx = {e: i for i, e in enumerate(ordered)}
@@ -147,11 +168,25 @@ def main() -> None:
     ap.add_argument(
         "--json-out", help="also write {entities, matrix} as JSON (for tests)"
     )
+    ap.add_argument(
+        "--schema",
+        help="codelens schema --command CMD output for the analysis being "
+        "plotted; enables the aggregation guard on the involvement ranking",
+    )
     args = ap.parse_args()
 
-    entities, matrix = build_matrix(
-        load_rows(args.pairs), args.a_col, args.b_col, args.weight_col, args.top
-    )
+    try:
+        roles = roles_from_schema(args.schema) if args.schema else {}
+        entities, matrix = build_matrix(
+            load_rows(args.pairs),
+            args.a_col,
+            args.b_col,
+            args.weight_col,
+            args.top,
+            roles,
+        )
+    except AggregationError as e:
+        die(str(e), 2)
     draw(entities, matrix, args.title, args.note, args.out)
 
     if args.json_out:

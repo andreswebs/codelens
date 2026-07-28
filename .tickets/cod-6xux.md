@@ -1,6 +1,6 @@
 ---
 id: cod-6xux
-status: open
+status: closed
 deps: [cod-nve7]
 links: []
 created: 2026-07-28T16:48:28Z
@@ -65,3 +65,9 @@ supply-chain default rather than a broken package, and does not reflexively disa
 - Names item 6 as the only scheduled parity check for `flint_spec.py`'s channel table.
 - markdownlint clean.
 
+
+## Notes
+
+**2026-07-28T19:02:38Z**
+
+Six-item Flint upgrade checklist now lives directly above the pinned imports in docs/skills/codelens/scripts/flint_render.ts, replacing the previous three-line pointer at the spec. It is self-contained: the 9 semantic type names, the Network Graph x=source/y=target convention, the private _warnings field, intrinsicDomain as a gate (and why the bare percentage mapping depends on that), the 6 default chart-type names, and the declared channel lists. Item 6 is explicitly named as the only scheduled parity check for flint_spec.py's channel table. The 0.4.0-not-latest rationale (Deno minimumDependencyAge refuses versions under 24h old, verified against 0.4.1) is recorded there too, with the instruction to wait the window out rather than disable the guard. references/flint.md summarises the checklist and points at the script. Verified with markdownlint-cli2 (clean), deno check (clean), and make build (green). Nothing enforces the checklist in CI by design (Q8); the renderer's TEMPLATE_CHANNELS validation still catches channel drift at render time for rendered specs only.

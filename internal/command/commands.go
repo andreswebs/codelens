@@ -150,6 +150,8 @@ func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 			return err
 		}
 
+		warnTemporalRecounts(cmd, d)
+
 		opts := analysisOpts(cmd, d)
 		opts.Warn = func(code, message, hint string, details any) {
 			output.EmitWarning(cmd.Root().ErrWriter, code, message, hint, details)
@@ -162,7 +164,7 @@ func actionFor(d analysis.Descriptor, stdin io.Reader) cli.ActionFunc {
 
 		res := output.NewResult(output.Meta{
 			Analysis:   d.Name,
-			Shape:      d.Shape,
+			Shape:      string(d.Shape),
 			Semantics:  semanticsFor(cmd, d),
 			Transforms: transformsRecord(cmd),
 			Columns:    columnNames(d),
@@ -323,7 +325,9 @@ func columnNames(d analysis.Descriptor) []string {
 // descriptor's declared semantics minus the columns excluded by an unset flag
 // (D15), then adjusted for the active transforms (D4). It is a pure function of
 // the descriptor and the parsed flags, so the map is deterministic for a given
-// command line.
+// command line. The result is converted to plain strings at the return: output
+// does not import analysis (the dependency runs the other way), so the typed
+// vocabulary stops here at the boundary.
 func semanticsFor(cmd *cli.Command, d analysis.Descriptor) map[string]string {
 	omit := make(map[string]bool)
 	for _, c := range d.RowSchema {
@@ -331,8 +335,12 @@ func semanticsFor(cmd *cli.Command, d analysis.Descriptor) map[string]string {
 			omit[c.FlagGated] = true
 		}
 	}
-	sem := analysis.SemanticsOf(d, omit)
-	return adjustForTransforms(sem, cmd.String("group") != "")
+	sem := adjustForTransforms(analysis.SemanticsOf(d, omit), cmd.String("group") != "")
+	out := make(map[string]string, len(sem))
+	for name, s := range sem {
+		out[name] = string(s)
+	}
+	return out
 }
 
 // adjustForTransforms returns semantics describing what THIS RUN emitted. A
@@ -346,11 +354,11 @@ func semanticsFor(cmd *cli.Command, d analysis.Descriptor) map[string]string {
 // command's default (filepath), the envelope declares the invocation (label).
 // The rule is applied generically over the map rather than naming entity, so
 // coupling's coupled column is covered too.
-func adjustForTransforms(sem map[string]string, grouped bool) map[string]string {
+func adjustForTransforms(sem map[string]analysis.Semantic, grouped bool) map[string]analysis.Semantic {
 	if !grouped {
 		return sem
 	}
-	out := make(map[string]string, len(sem))
+	out := make(map[string]analysis.Semantic, len(sem))
 	for name, s := range sem {
 		if s == analysis.SemanticFilepath {
 			s = analysis.SemanticLabel
@@ -358,6 +366,45 @@ func adjustForTransforms(sem map[string]string, grouped bool) map[string]string 
 		out[name] = s
 	}
 	return out
+}
+
+// warnTemporalRecounts raises temporal_period_recounts when --temporal-period
+// distorts an analysis's additive columns: the transform reinterprets a
+// revision as a logical change set, so a count column tallies overlapping
+// windows rather than commits. It lives here rather than in an analysis because
+// Opts deliberately excludes transform state (the pipeline runs before Run);
+// only the command layer holds both the descriptor and the parsed flags.
+//
+// A changeset-based analysis (coupling, sum-of-coupling) is exempt: treating a
+// revision as a logical change set is the entire purpose of the flag there, so
+// under a naive additive-column rule the two analyses the flag exists to serve
+// would be the loudest warners. The affected columns are named in details so a
+// consumer branches on data rather than parsing prose. Like every warning, it
+// never alters the exit code, and the transform's numbers are unchanged.
+func warnTemporalRecounts(cmd *cli.Command, d analysis.Descriptor) {
+	period := cmd.Int("temporal-period")
+	if period <= 0 || d.ChangesetBased {
+		return
+	}
+	affected := make([]string, 0, len(d.RowSchema))
+	for _, c := range d.RowSchema {
+		if analysis.AggRoleOf(c.Semantic) == analysis.AggAdditive {
+			affected = append(affected, c.Name)
+		}
+	}
+	if len(affected) == 0 {
+		return
+	}
+	output.EmitWarning(cmd.Root().ErrWriter,
+		"temporal_period_recounts",
+		"counts are per sliding window, not per commit",
+		"--temporal-period reinterprets a revision as a logical change set, so the named columns count windows rather than commits; drop it for commit-accurate counts, or use it with coupling / sum-of-coupling where that is the intent",
+		map[string]any{
+			"period_days":      period,
+			"affected_columns": affected,
+			"analysis":         d.Name,
+		},
+	)
 }
 
 // transformsRecord records which pipeline transforms actually ran (D4b), keyed in

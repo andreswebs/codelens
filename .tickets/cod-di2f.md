@@ -1,6 +1,6 @@
 ---
 id: cod-di2f
-status: open
+status: closed
 deps: [cod-6kzk]
 links: []
 created: 2026-07-28T16:48:28Z
@@ -108,3 +108,9 @@ why 18 subcommands are described as 20 analyses; read that before "fixing" any c
 - All touched markdown passes markdownlint against the project config.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T18:45:55Z**
+
+Skill wiring for the Flint spec lane. catalog.md gained a 'Two lanes, and what each one draws' section stating plan section 4's replaces/does-not-replace split in the skill itself, plus eight spec-lane cards (coupling/communication edge charts, churn stacked bars, summary KPI cards, code-age histogram, authors scatter, ranked lollipop, ownership share bars). Four artifact-lane cards (change-coupling graph, communication network, churn trend, summary tiles) gained a 'Lane:' line cross-linking the spec-lane card that replaces their chart body; the code-age map and fractal cards say explicitly that they are NOT replaced, so no two cards can disagree about the same chart. Shared spec-lane conventions (schema capture, --rows over Flint truncation, the deno invocation, formats) are stated once in the section preamble rather than on every card. SKILL.md now names both lanes under the routing table and points step 4 and step 6 at flint.md; before this the reference was unreachable from the skill entry point. run.bash and references/flint.md were already in place from earlier work on this ticket; both were verified end to end on this repo: run.bash produces out/flint/*.flint.json plus out/figs/flint-*.svg with deno present, and with deno absent from PATH it emits the specs, logs 'deno not on PATH', and leaves every artifact-lane figure unchanged. coupling and communication specs fail on this repo only because those analyses return zero rows at default thresholds (coupling_all_filtered); the artifact-lane figures fail on the same data. No .mcp.json committed. flint_spec_test.py 42/42 and flint_render_test.ts 15/15 green; make build green. Note for the next person: flint_render_test.ts needs --allow-run in addition to the render permission set, since it spawns the script as a subprocess.

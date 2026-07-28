@@ -27,7 +27,7 @@ type Column struct {
 	// Semantic names what the field means as opposed to how it is encoded (see
 	// Semantics). It is what makes a downstream chart spec derivable without domain
 	// knowledge, so it is required on every column.
-	Semantic string `json:"semantic"`
+	Semantic Semantic `json:"semantic"`
 	// Desc is a one-line description of the field's meaning.
 	Desc string `json:"desc"`
 	// FlagGated names the flag a column's presence depends on. An empty value means
@@ -115,11 +115,19 @@ type Descriptor struct {
 	// Shape names the topology of this analysis's payload (see Shapes). It is
 	// fixed per analysis: the payload key follows from it, and alternate views are
 	// downstream derivations rather than output modes.
-	Shape string
+	Shape Shape
 	// Flags declares the per-command flags the analysis honours.
 	Flags []Flag
 	// RowSchema declares the columns each output row carries.
 	RowSchema []Column
+	// ChangesetBased reports that the analysis interprets a revision as a
+	// logical change set rather than a physical commit. That is exactly what
+	// --temporal-period produces, so the transform is correct for these
+	// analyses (coupling, sum-of-coupling) and distorting for everyone else;
+	// the command layer uses this to decide whether the transform warrants a
+	// warning. The distinction is not derivable from column semantics: soc is
+	// an additive count that is SUPPOSED to count windows.
+	ChangesetBased bool
 	// ErrorCodes lists only the terr codes DISTINCTIVE to this analysis, beyond
 	// the common input, option, and output-layer codes every command can
 	// produce. Those baseline codes are reported once at tool level as a schema's

@@ -1,6 +1,6 @@
 ---
 id: cod-eex1
-status: open
+status: closed
 deps: [cod-x0fv]
 links: []
 created: 2026-07-28T16:34:16Z
@@ -208,3 +208,20 @@ assertion that proves `ChangesetBased` works.
 - Transform output numbers are unchanged.
 - `make build` green.
 
+
+## Notes
+
+**2026-07-28T17:31:01Z**
+
+Implemented per plan 004 section 7.2, TDD, all acceptance criteria met.
+
+- internal/analysis/aggrole.go: AggAdditive/AggIntensive/AggDimension/AggIdentifier, AggRoles(), ValidAggRole(), AggRoleOf() (switch with NO default; unknown input returns ""). Both mandatory doc comments in place: duration_months is intensive (deliberate divergence from Flint, age is a level not a quantity) on AggIntensive; identifier defined by behaviour not uniqueness on AggIdentifier. signed-additive omitted per ADR 0008 reachable-only rule, with a negative test guarding it.
+- aggrole_test.go: exhaustiveness test (every Semantics() member maps to a ValidAggRole), full 12-assignment table test, closed-set test, unknown-input test.
+- Descriptor.ChangesetBased added (analysis.go doc comment explains why: not derivable from column semantics, soc is SUPPOSED to count windows); true only in coupling.go and soc.go. Conformance test pinning exactly those two lives in internal/command/changeset_test.go, NOT internal/analysis, because the analysis package registry tests resetRegistry() and stub the global All().
+- temporal_period_recounts warning emitted from warnTemporalRecounts in internal/command/commands.go (called in actionFor after pipeline.Apply so a failed transform never warns), through output.EmitWarning. Condition: temporal-period > 0, not ChangesetBased, and >=1 declared column with AggRoleOf == additive. details carries period_days, affected_columns, analysis. Exit code unchanged. analysis.Opts untouched.
+- Golden triples added: revisions_temporal (the .err pins the warning; n_revs=6 windows vs 8 commits shows the recount) and soc_temporal (EMPTY .err = the negative assertion proving ChangesetBased). New dailyPairLog helper spreads pair commits over consecutive days so temporal windows are real. First goldens ever to exercise --temporal-period.
+- TestE2E_Pipeline_Temporal updated: its runAuthors helper asserts empty stderr, now stale for that path; the temporal run asserts the warning is PRESENT instead. See learnings.md entry.
+- operating.md --temporal-period bullet now documents the warning (matches coupling_all_filtered style).
+- Transform output numbers unchanged (no transform code touched); verified against the real repo log. make build green.
+
+Next (cod-67tb): publish aggregation_roles in both schema forms; the vocabulary and AggRoleOf are ready to consume.
