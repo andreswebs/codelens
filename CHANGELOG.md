@@ -52,6 +52,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so `schema_version` stays at `1`; a consumer that ignores unknown keys is
   unaffected.
 
+- **Aggregation roles in `schema`.** `schema` now publishes an
+  `aggregation_roles` map from semantic to a closed four-member role vocabulary,
+  stating how a value carrying that semantic may be COMBINED: `count` and `loc`
+  are `additive` (parts sum to a meaningful total), `percentage`, `ratio` and
+  `duration_months` are `intensive` (a sum is not a meaningful value),
+  `filepath`, `person`, `date`, `label` and `flag` are `dimension` (a grouping
+  key, not a measure), and `commit_id` and `text` are `identifier` (neither
+  aggregated nor grouped on). It answers the one question `semantics` left open:
+  a consumer knew a column was a `ratio` but not that summing it is meaningless.
+
+  Published in both schema forms, mirroring the existing treatment of error
+  codes: the full 12-entry catalog in `schema` (no `--command`), and the subset a
+  command's own columns use in `schema --command CMD`, so one captured schema
+  file is enough to check that command's aggregations. The catalog is also the
+  first place the closed semantic vocabulary is enumerated in the contract;
+  previously the 12 members appeared only per-column inside `row_schema`.
+
+  The role is derived from the semantic, never stored per column, so it cannot
+  drift from the vocabulary it describes, and a conformance test pins every
+  semantic to a declared role. Two assignments are deliberate and worth not
+  "correcting": `duration_months` is `intensive` because codelens's only such
+  column is `code-age`'s months-since-last-change, which is a level rather than a
+  quantity (summing the ages of 500 files is meaningless), and `identifier`
+  is defined by behaviour rather than uniqueness, which is why free prose (`text`)
+  shares it with a commit hash.
+
+  The result envelope is unchanged and `schema_version` stays at `1`: this is
+  additive to `schema` only.
+
+- **`--temporal-period` now warns when it invalidates a count.** The transform
+  reinterprets a revision as a logical change set by collapsing commits into
+  sliding N-day windows, which is the point for the coupling analyses and
+  distorting for every other one: overlapping windows mean a count column no
+  longer counts commits. Running it against a non-changeset analysis that emits
+  an additive column now raises a warning on stderr naming the affected columns,
+  so the reinterpretation is visible rather than silent. `coupling` and
+  `sum-of-coupling` are unaffected, being the analyses the flag exists to serve.
+  Warnings never alter the exit code, and the numbers the transform produces are
+  unchanged.
+
 ### Changed
 
 - **Breaking: error codes are now unique per sentinel.** Three error codes were

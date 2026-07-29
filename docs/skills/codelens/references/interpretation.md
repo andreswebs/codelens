@@ -1,4 +1,4 @@
-# Reading the crime scene
+# Reading a result
 
 The interpretation authority for the codelens visualizations. Loaded from
 [SKILL.md](../SKILL.md) step 5. The [catalog](catalog.md) `Read:` lines are hooks;
@@ -6,9 +6,14 @@ this file holds the full reading: the investigative funnel that orders an
 investigation, a reading block per visualization, the heuristics table (the one
 home for every number), and the guardrails the social analyses must respect.
 
-The recurring picture is a **hotspot**: complicated code that changes often. An
-investigation is offender profiling: narrow from where the risk is, to whether it
-is getting worse, to why it spreads, to who it touches.
+The recurring subject is a **hotspot**: complicated code that changes often. An
+investigation narrows in stages: from where the risk is, to whether it is getting
+worse, to why it spreads, to who it touches.
+
+Much of the reading below follows Adam Tornhill's _Your Code as a Crime Scene_,
+which is where the hotspot, knowledge-map and fractal-figure interpretations and
+most of the threshold numbers come from. It is one reference among several, and the
+guardrails at the end apply regardless of which vocabulary you use.
 
 ## The investigative funnel
 

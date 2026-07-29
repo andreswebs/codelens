@@ -44,6 +44,15 @@ class TrendRepo:
             ["git", "-C", str(self.root), *args], check=True, capture_output=True
         )
 
+    def head(self) -> str:
+        r = subprocess.run(
+            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return r.stdout.strip()
+
     def commit(self, path: str, body: str) -> None:
         """Write `body` to `path` (creating dirs) and commit it."""
         fp = self.root / path
@@ -52,13 +61,17 @@ class TrendRepo:
         self._git("add", "-A")
         self._git("commit", "-q", "-m", f"touch {path}")
 
+    def delete(self, path: str) -> None:
+        self._git("rm", "-q", path)
+        self._git("commit", "-q", "-m", f"delete {path}")
+
     def rename(self, old: str, new: str) -> None:
         (self.root / new).parent.mkdir(parents=True, exist_ok=True)
         self._git("mv", old, new)
         self._git("commit", "-q", "-m", f"rename {old} -> {new}")
 
 
-def run_trend(repo: Path, file: str) -> tuple[int, str, bool, int | None]:
+def run_trend(repo: Path, file: str, *extra: str) -> tuple[int, str, bool, int | None]:
     """Run the script; return (rc, stderr, out_exists, revisions_reported)."""
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "trend.svg"
@@ -72,13 +85,20 @@ def run_trend(repo: Path, file: str) -> tuple[int, str, bool, int | None]:
                 file,
                 "-o",
                 str(out),
+                *extra,
             ],
             capture_output=True,
             text=True,
         )
-        m = re.search(r"\((\d+) revisions\)", proc.stderr)
+        m = re.search(r"\((\d+) revisions", proc.stderr)
         revs = int(m.group(1)) if m else None
         return proc.returncode, proc.stderr, out.is_file(), revs
+
+
+def reported_paths(stderr: str) -> list[str]:
+    """The paths the series was actually read at, per the `wrote ...` line."""
+    m = re.search(r"paths: ([^)]+)\)", stderr)
+    return m.group(1).split(", ") if m else []
 
 
 class TestTrend(unittest.TestCase):
@@ -121,6 +141,55 @@ class TestTrend(unittest.TestCase):
         self.assertEqual(rc, EXIT_OK, msg=stderr)
         self.assertTrue(out_exists, msg=stderr)
         self.assertEqual(revs, 5, msg=stderr)
+
+    def test_series_spans_both_sides_of_a_directory_rename(self) -> None:
+        # The regression case: a bulk `src` -> `adminSrc` directory move. Every
+        # revision resolves, and the series is read at both names.
+        old = "Keeper/src/Infra/Mod.cs"
+        new = "Keeper/adminSrc/Infra/Mod.cs"
+        with tempfile.TemporaryDirectory() as d:
+            repo = TrendRepo(Path(d))
+            repo.commit(old, "a\n  b\n")
+            repo.commit("Keeper/src/Infra/Other.cs", "x\n")
+            repo.commit(old, "a\n  b\n    c\n")
+            repo.rename("Keeper/src", "Keeper/adminSrc")
+            repo.commit(new, "a\n  b\n    c\n      d\n")
+            rc, stderr, out_exists, revs = run_trend(Path(d), new)
+        self.assertEqual(rc, EXIT_OK, msg=stderr)
+        self.assertTrue(out_exists, msg=stderr)
+        self.assertEqual(revs, 4, msg=stderr)
+        self.assertNotIn("skipped", stderr)
+        self.assertEqual(reported_paths(stderr), [old, new], msg=stderr)
+
+    def test_unresolvable_revision_is_skipped_not_fatal(self) -> None:
+        # A delete-then-readd history lists a commit in which the file does not
+        # exist at any path it ever carried. That one revision must cost one data
+        # point, never the whole figure.
+        with tempfile.TemporaryDirectory() as d:
+            repo = TrendRepo(Path(d))
+            repo.commit("f.py", "def f():\n    pass\n")
+            repo.delete("f.py")
+            repo.commit("f.py", "def f():\n    if True:\n        pass\n")
+            rc, stderr, out_exists, revs = run_trend(Path(d), "f.py")
+        self.assertEqual(rc, EXIT_OK, msg=stderr)
+        self.assertTrue(out_exists, msg=stderr)
+        self.assertEqual(revs, 2, msg=stderr)
+        self.assertIn("skipped 1 of 3 revisions", stderr)
+
+    def test_every_revision_unresolvable_is_fatal(self) -> None:
+        # Nothing to plot is still a real error: the range holds only the commit
+        # that deleted the file.
+        with tempfile.TemporaryDirectory() as d:
+            repo = TrendRepo(Path(d))
+            repo.commit("f.py", "def f():\n    pass\n")
+            first = repo.head()
+            repo.delete("f.py")
+            rc, stderr, out_exists, _revs = run_trend(
+                Path(d), "f.py", "--start", first, "--end", repo.head()
+            )
+        self.assertEqual(rc, EXIT_USAGE, msg=stderr)
+        self.assertFalse(out_exists, msg=stderr)
+        self.assertIn("could be resolved", stderr)
 
     def test_trend_missing_file(self) -> None:
         # No history for the file preserves the exit-3 no-history contract.

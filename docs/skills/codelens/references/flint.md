@@ -81,6 +81,20 @@ The renderer re-validates every encoding channel against Flint's own declared
 template channels, so a spec produced by a stale channel table fails loudly
 here rather than rendering with a channel silently dropped.
 
+### First run downloads a large dependency tree
+
+Flint pulls vega, vega-lite, echarts, plotly, chart.js, and native bindings for resvg
+and canvas. The first `flint_render.ts` invocation therefore prints a few hundred
+`Download https://registry.npmjs.org/...` lines to stderr and takes noticeably longer
+than later ones; Deno caches it globally afterwards, so subsequent runs are quiet and
+fast. In a `run.bash` fleet run this cost lands entirely on the first repository.
+
+Two consequences worth knowing. The noise is on stderr and interleaves with the render
+summary, so read the LAST line (`rendered <chartType> (<backend>) svg: WxH`) rather than
+scanning stderr for problems. And the first run needs network: on an offline machine
+`command -v deno` still succeeds while the render fails, which `run.bash` reports
+per-figure and treats as non-fatal, leaving the specs in `OUT/flint/` for the MCP path.
+
 ## Rendering path 2: MCP, for agent and interactive use
 
 The flint-chart MCP server renders in-process with no browser: run it with

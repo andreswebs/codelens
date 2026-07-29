@@ -14,9 +14,13 @@ oldest-first time series and a line chart of total complexity with LOC overlaid.
 
 Shapes to read: deteriorating (rising, act), refactored (a dip), stable.
 
+A revision whose path cannot be resolved (a deletion, an undetected copy) is
+skipped and reported on stderr; only a series with no resolvable revision at all
+is an error.
+
 Usage:
   uv run scripts/complexity_trend.py --repo . --file src/foo.go -o trend.svg
-Exit codes: 0 ok; 2 usage; 3 no history for the file.
+Exit codes: 0 ok; 2 usage or nothing resolvable; 3 no history for the file.
 """
 
 from __future__ import annotations
@@ -43,13 +47,29 @@ def git(repo: str, *args: str) -> str:
     return r.stdout
 
 
-def enumerate_revs(repo: str, file: str, rng: str) -> list[tuple[str, str, str]]:
-    """Return (rev, date, path_at_rev) oldest-first across the file's whole life.
+def git_try(repo: str, *args: str) -> str | None:
+    """Tolerant `git`: None instead of exit on a non-zero status.
+
+    Per-revision content fetches are best effort. A long history with copies,
+    merges, deletions, and case-only renames will occasionally fail to resolve a
+    path, and a miss must cost one data point rather than the whole figure.
+    """
+    r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    return None if r.returncode != 0 else r.stdout
+
+
+def enumerate_revs(
+    repo: str, file: str, rng: str
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Return ((rev, date) oldest-first, candidate paths newest-name-first).
 
     `--follow` yields commits from before the file reached its current path, so
-    each revision must be fetched at the path it carried *then*. `--name-status`
-    surfaces that path per commit: a rename is `R<score>\\t<old>\\t<new>` (the new
-    side is the path this commit produced), everything else is `<status>\\t<path>`.
+    each revision must be read at the path it carried *then*. Pairing a
+    `--name-status` line to its commit header is not reliable across bulk
+    directory moves, so the status lines are mined only for the SET of names the
+    file ever carried; `fetch_at` resolves each revision against that set by
+    asking git per revision. Names are ordered newest-first because the log is:
+    for `R<score>\\t<old>\\t<new>` the new side is the later name.
     """
     log = git(
         repo,
@@ -62,25 +82,27 @@ def enumerate_revs(repo: str, file: str, rng: str) -> list[tuple[str, str, str]]
         "--",
         file,
     )
-    revs: list[tuple[str, str, str]] = []
-    rev: str | None = None
-    date = ""
-    path: str | None = None
+    revs: list[tuple[str, str]] = []
+    names = [file]
     for line in log.splitlines():
         if not line.strip():
             continue
         parts = line.split("\t")
         if len(parts) == 2 and _HASH.match(parts[0]):
-            if rev is not None and path is not None:
-                revs.append((rev, date, path))
-            rev, date = parts
-            path = None
-        elif path is None:  # first status line of the current commit
-            path = parts[2] if parts[0][:1] in ("R", "C") else parts[1]
-    if rev is not None and path is not None:
-        revs.append((rev, date, path))
+            revs.append((parts[0], parts[1]))
+        else:
+            names.extend(reversed(parts[1:]))
     revs.reverse()  # oldest first
-    return revs
+    return revs, list(dict.fromkeys(names))
+
+
+def fetch_at(repo: str, rev: str, candidates: list[str]) -> tuple[str, str] | None:
+    """Return (path, source) for `rev`, trying each historical name in turn."""
+    for path in candidates:
+        src = git_try(repo, "show", f"{rev}:{path}")
+        if src is not None:
+            return path, src
+    return None
 
 
 def indentation(source: str) -> tuple[int, float]:
@@ -112,7 +134,7 @@ def main() -> None:
     args = ap.parse_args()
 
     rng = f"{args.start}..{args.end}" if args.start else args.end
-    revs = enumerate_revs(args.repo, args.file, rng)
+    revs, candidates = enumerate_revs(args.repo, args.file, rng)
     if not revs:
         print(f"complexity_trend.py: no history for {args.file}", file=sys.stderr)
         raise SystemExit(3)
@@ -120,12 +142,34 @@ def main() -> None:
     dates: list[str] = []
     totals: list[float] = []
     locs: list[int] = []
-    for rev, date, path in revs:
-        src = git(args.repo, "show", f"{rev}:{path}")
+    paths: list[str] = []
+    skipped = 0
+    for rev, date in revs:
+        got = fetch_at(args.repo, rev, candidates)
+        if got is None:
+            skipped += 1
+            continue
+        path, src = got
+        if path not in paths:
+            paths.append(path)
         n, total = indentation(src)
         dates.append(date)
         totals.append(round(total, 2))
         locs.append(n)
+
+    if not totals:
+        print(
+            f"complexity_trend.py: no revision of {args.file} could be resolved "
+            f"({skipped} of {len(revs)} revisions failed)",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if skipped:
+        print(
+            f"complexity_trend.py: skipped {skipped} of {len(revs)} revisions "
+            "whose path could not be resolved",
+            file=sys.stderr,
+        )
 
     import matplotlib
 
@@ -143,7 +187,11 @@ def main() -> None:
     ax1.set_title(f"Complexity trend: {Path(args.file).name}")
     fig.tight_layout()
     fig.savefig(args.out)
-    print(f"wrote {args.out} ({len(totals)} revisions)", file=sys.stderr)
+    print(
+        f"wrote {args.out} ({len(totals)} revisions across "
+        f"{len(paths)} paths: {', '.join(paths)})",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

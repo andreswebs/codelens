@@ -96,6 +96,24 @@ def is_code(entity: str) -> bool:
     return NONCODE.search(entity) is None
 
 
+def commit_messages(path: Path) -> list[str]:
+    """Return one commit subject per commit from a `codelens parse` dump.
+
+    parse emits one row per (commit, file) pair with the subject repeated on
+    every row, so any per-commit tally over it MUST collapse by `rev` first.
+    Counting rows instead inflates each term by its own average files-per-commit,
+    which reorders a ranking rather than merely scaling it. This mirrors
+    commit_cloud.py, the reference implementation, so the digest's top terms and
+    the word cloud rendered from the same data cannot disagree. Rows without a
+    `rev` fall back to keying on the message, as commit_cloud does."""
+    by_rev: dict[str, str] = {}
+    for r in load_rows(path):
+        msg = str(r.get("message") or "")
+        if msg:
+            by_rev[str(r.get("rev") or msg)] = msg
+    return list(by_rev.values())
+
+
 def build_digest(d: Path, roles: Roles) -> list[str]:
     """Build the digest lines for the analysis directory `d`. `roles` carries the
     churn columns' aggregation roles, or is empty when --schema was not given."""
@@ -203,13 +221,16 @@ def build_digest(d: Path, roles: Roles) -> list[str]:
         w(f"- strength={r.get('strength'):>3} shared={r.get('shared')}  {r['author']} <-> {r['peer']}")
 
     # --- commit vocabulary ---
+    msgs = commit_messages(d / "parse.json")
     words: Counter[str] = Counter()
-    for r in load_rows(d / "parse.json"):
-        msg = str(r.get("message") or "").lower()
-        for tok in re.findall(r"[a-z][a-z0-9_-]{2,}", msg):
+    for msg in msgs:
+        for tok in re.findall(r"[a-z][a-z0-9_-]{2,}", msg.lower()):
             if tok not in STOP:
                 words[tok] += 1
     w("\n## commit vocabulary (heuristic, top terms)")
+    # State the denominator: a term's count is commits-containing-it, so it only
+    # reads as a finding against the total ("feat in 1,266 of 7,254 commits").
+    w(f"- counted once per commit over {len(msgs)} commits with a subject")
     w("- " + ", ".join(f"{word}({n})" for word, n in words.most_common(20)))
 
     return out

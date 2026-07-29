@@ -1,9 +1,9 @@
 # codelens
 
-codelens mines a git log and runs any of 20 evolutionary code analyses (coupling,
+codelens mines a git log and runs any of 18 evolutionary code analyses (coupling,
 hotspots, churn, ownership, code age, and more), emitting a self-describing JSON
-envelope by default. It reads the log on stdin and is strictly read-only: it never
-runs git, writes files, or produces side effects.
+envelope. It reads the log on stdin and is strictly read-only: it never runs git,
+writes files, or produces side effects.
 
 ## Operating codelens
 

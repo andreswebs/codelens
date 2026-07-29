@@ -1,11 +1,13 @@
 ---
 name: codelens
-description: "Operate the codelens CLI and visualize its output. Mine a git log and run any of codelens's 20 evolutionary analyses (hotspots, coupling, churn, ownership, code age), then turn the results into crime-scene visualizations: enclosure hotspot maps, coupling and communication graphs, churn and complexity trends, knowledge maps. Use when running codelens analyses or rendering them as embeddable SVG, interactive HTML, or PNG for docs, slides, and reports."
+description: "Operate the codelens CLI and visualize its output: mine a git log, run any of its 18 evolutionary analyses (hotspots, coupling, churn, ownership, code age, commit vocabulary), render a result as a chart, or assemble a whole-repository findings report. Use when running a codelens analysis, when turning one into embeddable SVG, interactive HTML, or PNG for docs and slides, or when asked to analyze how a code base has evolved."
 ---
 
 # codelens code base visualization
 
-Turn `codelens` output into the crime-scene visualizations from Adam Tornhill's _Your Code as a Crime Scene_. The recurring picture is a **hotspot**: complex code that changes often. Every run follows one pipeline; the visualization chosen decides the data collected and the script run.
+Turn `codelens` output into charts that answer a question about a code base. The recurring subject is the **hotspot**: complex code that changes often. Every run follows one pipeline; the visualization chosen decides the data collected and the script run.
+
+The readings draw on Adam Tornhill's _Your Code as a Crime Scene_ for the hotspot, knowledge-map and fractal-figure interpretations, among other sources.
 
 `codelens` mines a git log and emits structured JSON. This skill both operates the
 CLI and visualizes its output. To run analyses (the canonical pipe workflow,
@@ -40,11 +42,9 @@ sidecars, formats, and how to read the result).
 
 Those ten rows are the **artifact lane**: each script writes a finished HTML, SVG,
 or PNG file and needs only `uv`. A second lane, `flint_spec.py`, writes a Flint
-chart _spec_ that a downstream renderer (Deno, or the flint-chart MCP server) turns
-into SVG or PNG. It draws the edge tables, the churn trend, the summary tiles, the
-code-age distribution, and three charts the artifact lane has no counterpart for.
-The lanes coexist: the hierarchical maps and the word cloud cannot be expressed in
-Flint at all. Which lane draws what is settled in
+chart _spec_ that a downstream renderer turns into SVG or PNG, and covers several
+charts the artifact lane has no counterpart for. Which lane draws which chart is
+settled in
 [catalog.md](references/catalog.md#two-lanes-and-what-each-one-draws); the two
 rendering paths are in [flint.md](references/flint.md).
 
@@ -53,7 +53,7 @@ rendering paths are in [flint.md](references/flint.md).
 Generate a compatible log and run the chosen analysis:
 
 ```sh
-eval "$(codelens print-log-command --after "$SINCE")" > git.log
+eval "$(codelens print-log-command --after "${SINCE}")" > git.log
 codelens <analysis> --log git.log > data.json
 ```
 
@@ -84,23 +84,23 @@ uv run scripts/enclosure.py --weights data.json --structure tokei.json -o hotspo
 
 ### 4. Render the requested formats
 
-- **Static** (churn, fractal, word cloud, complexity trend, summary): the script
-  writes one file, and the `-o` extension picks the format (`.svg` or `.png`),
-  never both in one run; run the script twice to get both. Use these for slides
-  and PDF.
-- **Interactive** (enclosure, coupling, network): the script writes an `.html`
-  file (D3 from a CDN, data inlined) for live viewing and iframe embedding. These
-  are not exported to static images.
-- **Spec lane** (`flint_spec.py`): the spec is not an artifact. Render it with
-  `flint_render.ts` under Deno for SVG or PNG, or hand it to the flint-chart MCP
-  server; [flint.md](references/flint.md) has both invocations, the permission
-  flags Deno needs, and the MCP stdio config.
+Which case applies is the `Interactive` column of the step 1 table.
+
+- **Static:** the `-o` extension picks the format (`.svg` or `.png`), one per run;
+  run the script twice for both. Use these for slides and PDF.
+- **Interactive:** the script writes an `.html` file for live viewing and iframe
+  embedding, and has no static export. For a picture of the same data, render its
+  degraded counterpart (`treemap.py`, `pair_matrix.py`) per
+  [embedding.md](references/embedding.md).
+- **Spec lane:** a spec is not an artifact. Render it with `flint_render.ts` under
+  Deno, or hand it to the flint-chart MCP server; [flint.md](references/flint.md)
+  has both invocations, the permission flags Deno needs, and the MCP stdio config.
 
 Target mechanics (inline SVG, iframe) are in [embedding.md](references/embedding.md).
 
 **Done when:** an artifact exists in every requested format.
 
-### 5. Read the crime scene
+### 5. Read the result
 
 State the finding in the visualization's own terms.
 [interpretation.md](references/interpretation.md) is the reading authority: the
@@ -116,16 +116,22 @@ just the chart handed over.
 ### 6. Compose the report (optional)
 
 When the deliverable is a sequenced findings report rather than a single chart,
-assemble one self-contained markdown document with `scripts/report.py`. Run
-`scripts/run.bash --repo PATH --out out/` to produce the analyses, the degraded
-static figures (`treemap.py`, `pair_matrix.py`, and the static charts), and a
-grounding `digest.md` in one command; write a findings file (your reading of each
-analysis, per [interpretation.md](references/interpretation.md), grounded in the
-digest); and run the assembler. It pins the investigative sequence, embeds the
-figures inline as SVG, and always emits the social-analysis guardrails. See
-[reporting.md](references/reporting.md). `run.bash` also emits the spec lane
-additively - specs into `OUT/flint/`, and `OUT/figs/flint-*.svg` when `deno` is on
-PATH - so a run without Deno produces exactly what it always did.
+three commands replace steps 1 to 4:
+
+```sh
+bash scripts/run.bash --repo "${REPO}" --out out/   # every analysis, figure, digest.md
+# write findings.md: your reading of each analysis, grounded in out/digest.md
+uv run scripts/report.py --findings findings.md --figures-dir out/figs/ \
+  --summary out/summary.json -o report.md
+```
+
+`run.bash` covers both lanes, so this path yields the interactive artifacts too;
+steps 2 and 3 are for tuning one by hand. `report.py` pins the investigative
+sequence, embeds figures inline as SVG, and always emits the social-analysis
+guardrails. Read each finding per
+[interpretation.md](references/interpretation.md). The output inventory, the
+findings-file format, and the figure stems are in
+[reporting.md](references/reporting.md).
 
 **Done when:** `report.py` exits `0` and `report.md` carries every section with its
 findings and figures.

@@ -12,12 +12,19 @@ reproducible while the reading stays a matter of judgment
 
 ## Pipeline
 
-1. Run the analyses and render the **degraded static** figures (SVG) into one
+1. Run the analyses, render the **degraded static** figures (SVG) that this
+   report embeds, and build the interactive artifacts alongside them, into one
    directory. `scripts/run.bash` does this in one command:
 
    ```sh
-   bash scripts/run.bash --repo PATH --out out/
+   bash scripts/run.bash --repo "${REPO}" --out "$(pwd)/out"
    ```
+
+   A relative `--out` resolves against the directory you invoked the script from,
+   not against the repository it `cd`s into, so `--out out/` is safe while analyzing
+   someone else's checkout. An absolute path is still the clearer form when the two
+   directories differ. The script is strictly read-only with respect to git history
+   and the working tree.
 
    It generates the logs, runs every analysis, renders the figures under
    `out/figs/` with the conventional stems below, and writes `out/digest.md`
@@ -26,12 +33,23 @@ reproducible while the reading stays a matter of judgment
    applies a built-in generated-file exclude set to every entity-centric analysis
    (`--exclude GLOB` to add more), and runs `code-age` against full history. It is
    read-only against the repo and best-effort: a figure with no data (for example
-   coupling below the threshold) is skipped, not fatal. Requires codelens, git,
-   tokei, and uv on PATH.
+   coupling below the threshold) is skipped, not fatal. Requires bash 4.4+, and
+   codelens, git, tokei, and uv on PATH.
 
    To render by hand instead, run `treemap.py` for the enclosure family,
    `pair_matrix.py` for coupling and communication, and the static charts, writing
    the conventional stems below. A missing figure just omits its picture.
+
+   `run.bash` also writes the **interactive lane** into `out/interactive/`:
+   `hotspots.html`, `knowledge.html` and `age.html` from `enclosure.py` (the same
+   three maps the static lane degrades, as zoomable circle-packing), plus
+   `coupling.html` from `coupling_graph.py` and `network.html` from
+   `dev_network.py`. The reusable hierarchy is written once, as
+   `out/interactive/hierarchy.json`. **`report.py` does not consume any of these.**
+   Its contract is inline SVG, which an HTML artifact cannot be; the interactive
+   files are for browsing and for iframe embedding elsewhere. They are additive and
+   best effort: each has its own `out/interactive/NAME.stderr` and a single failure
+   warns without failing the run.
 
    `run.bash` also captures each analysis's `codelens schema --command CMD` output
    under `out/schema/`, and passes it as `--schema` to the scripts that combine
@@ -41,6 +59,19 @@ reproducible while the reading stays a matter of judgment
    `degree` or `strength`, while a total used only to rank permits one. The flag
    is optional and the check degrades to a pass-through without it, so a
    hand-rendered figure still works unchecked; pass it to get the check.
+
+   Because that degradation is silent by design, **a `codelens` too old to emit
+   `aggregation_roles` produces a fully successful run in which nothing is checked.**
+   Every figure renders, every exit code is `0`, and the guard never fires. Confirm the
+   binary you are actually invoking before trusting a run, especially when a
+   package-manager copy shadows a local build:
+
+   ```sh
+   command -v codelens && codelens --version
+   codelens schema | jq -e '.aggregation_roles | length == 12' >/dev/null \
+     && echo "roles published" || echo "STALE: no aggregation_roles"
+   ```
+
 2. Write the findings file (below), one prose block per analysis, grounded in
    `out/digest.md`: a compact per-analysis signal (hotspots split code vs
    docs/config, coupling, ownership, fragmentation, age, churn, vocabulary) that
@@ -140,6 +171,45 @@ stripped) so the report is a single self-contained file with no external asset
 references. Caveat: inline SVG renders under pandoc and HTML pipelines, but GitHub's
 markdown sanitizer strips it - the report targets HTML/pandoc rendering, not GitHub
 preview.
+
+### Rendering to PDF: use an HTML engine, never LaTeX
+
+Inline SVG is raw HTML, and **pandoc's LaTeX engines silently discard raw HTML**. So
+the default `pandoc report.md -o report.pdf` produces a clean, valid, figure-less PDF:
+every figure vanishes, no warning is printed, and the only clue is that the captions
+now sit under nothing. Use an HTML-based engine, which renders inline SVG:
+
+```sh
+pandoc -f gfm "${OUT}/report.md" -c report.css \
+  -o "${OUT}/report.pdf" --pdf-engine=weasyprint
+```
+
+Two things the stylesheet must do, or the figures are cropped rather than missing:
+
+```css
+/* Charts are wider than the text column (the network graphs are 860x860),
+   and WeasyPrint renders them at intrinsic size, clipping at the margin. */
+svg { display: block; max-width: 100%; height: auto; margin: 0 auto 0.4rem; }
+/* Entity names are long file paths in code spans. */
+code { word-break: break-all; overflow-wrap: anywhere; }
+```
+
+WeasyPrint emits one `WARNING: Ignored 'fill: #rrggbb' ... unknown property` per SVG
+presentation attribute. That is noise from its CSS parser, not a rendering failure; the
+figures are fine. Expect a few hundred lines of it and filter with
+`grep -v 'Ignored '`.
+
+VERIFY THE PDF RATHER THAN TRUSTING THE EXIT CODE, because a dropped figure still
+exits `0`:
+
+```sh
+qpdf --show-npages report.pdf                 # sane page count
+pdftotext report.pdf - | grep -c 'Figure '    # caption count matches the figures
+pdftoppm -png -r 60 -f 3 -l 3 report.pdf p    # then actually look at a figure page
+```
+
+Scale reference: a 1.6MB report with 9 inline SVGs became a 12-page, 840KB PDF in under
+4 seconds.
 
 When scripting the figures yourself, judge each render script by its **exit code**,
 not by stderr: the scripts print their `wrote ...` summary and uv's `Installed N

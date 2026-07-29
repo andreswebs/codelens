@@ -1653,3 +1653,140 @@ set` -> `missing_required_flag`. Unknown _commands_ are classified upstream in
   (semantic -> role) with a self-consistency test, because it needs roles on
   every invocation. The guard deliberately does NOT reuse or extend it: roles
   come from `--schema` so there is no second copy of the vocabulary to drift.
+- `codelens parse` emits one row per (commit, file) pair, so ANY per-commit
+  tally over `parse.json` must collapse by `rev` first. `digest.py`'s commit
+  vocabulary did not, and the failure mode is worse than a scaled number: the
+  inflation factor is each term's own average files-per-commit, so it REORDERS
+  the ranking. On a repo averaging 5.0 files per commit, `dev` read as the 5th
+  most common term at 2,901 while appearing in 20 commits (145x); terms used in
+  wide commits (merges, bulk renames, generated-file regeneration) float to the
+  top and displace the real vocabulary. Anything that varies per row is a
+  weighting, not a count.
+- Two scripts consuming the same `parse.json` diverged silently because only one
+  of them deduped. `commit_cloud.py` had the dedupe (and a comment saying why);
+  `digest.py` did not, and the two sat on the same report page contradicting
+  each other. The regression test that pins this is not "count == N" but
+  "digest's ranking equals commit_cloud's algorithm on the same input" -
+  agreement between the two consumers is the invariant, and it is what makes the
+  contradiction impossible rather than merely currently-absent.
+- This was the second defect of this exact shape in `digest.py` (cod-b9td was
+  the analysis-window sampling bug). Both were misreadings of the git log's
+  structure rather than logic errors, which is why the fix landed as a named
+  `commit_messages()` helper: the correction belongs somewhere a future
+  parse-derived section will find it, not inlined at the one call site.
+- A bare frequency count is not a finding. `revert(1,290)` prompted a draft
+  report to assert a churn-through-reverts problem when `revert` was in 83 of
+  7,254 commits (1.1 percent). The digest now states its denominator on the line
+  above the terms; that keeps the `term(n)` format stable for existing readers
+  while making the counts interpretable.
+
+## complexity_trend.py: tolerant per-revision path resolution (cod-n3qm)
+
+- This supersedes cod-dxdk's design above. That fix read each revision's path
+  from the `--follow --name-status` status line under the preceding commit
+  header, and explicitly kept `git()`'s fatal-on-nonzero because "the fix passes
+  the correct path". Both halves of that reasoning failed on a
+  30,800-commit repository: one unresolvable revision of 385 discarded the whole
+  figure.
+- The fatal half reproduces in a fixture, and the reproduction is not a rename at
+  all: a delete-then-readd history. `--follow` lists the deletion commit, and the
+  file exists there under NO name it ever carried, so `git show <rev>:<path>`
+  fails legitimately. Any "we pass the correct path" argument is therefore
+  unsound in principle - some listed revisions have no resolvable path.
+- The pairing half did NOT reproduce. Probes across bulk directory moves,
+  low-score rename+rewrite, path swaps, merge-side renames, and delete/readd all
+  showed the status-line-to-header pairing to be correct. Rather than keep
+  hunting the upstream quirk from the field report, the dependency was removed:
+  `--follow --name-status` output is now mined ONLY for the commit list (header
+  lines) and the SET of names the file ever carried (all path fields, order
+  reversed per line so the rename's new side sorts newer). `fetch_at` then asks
+  git per revision, trying those names in order. Nothing depends on which header
+  a status line sits under.
+- Cost is up to one extra `git show` per revision per historical name (~2x
+  process spawns for the common single-rename case). Not optimized with a
+  "remember the last successful name" cache; add that only if a deep rename chain
+  on a large repo actually shows up as slow.
+- Posture: some revisions skipped is a warning on stderr plus a rendered figure;
+  ALL revisions unresolvable is still exit 2 with no output file. The distinction
+  is what makes the degradation trustworthy rather than silent.
+- The `wrote ... (N revisions across M paths: ...)` line now names the paths the
+  series was actually read at. That is what makes "the series spans both sides of
+  the rename" assertable from observable output, with no new flag and no stdout
+  contract change (`run.bash` captures only stderr). The pre-existing test regex
+  `\((\d+) revisions\)` had to lose its closing paren to keep matching.
+- `run.bash` now tries the top 5 hotspots in rank order until one renders,
+  instead of betting the figure on `revisions.json` row 0. One awkward file no
+  longer costs the figure; it costs a line on stderr.
+
+## run.bash: the interactive lane, and byte-identity as an unusable gate (cod-1mai)
+
+- `run.bash` never invoked `enclosure.py`, `coupling_graph.py` or
+  `dev_network.py`, so the flagship visualization was unreachable from the
+  one-command path and the two graph scripts had no end-to-end exercise at all.
+  Adding an interactive lane in the shape of the existing Flint lane - own
+  subdirectory, own per-artifact stderr, best-effort failure - closes both at
+  once, because the pipeline run _is_ the end-to-end test.
+- The ticket's headline acceptance criterion, "every pre-existing figure is
+  BYTE-IDENTICAL before and after", is not satisfiable and never was: matplotlib
+  stamps `<dc:date>` with wall-clock time and generates random `clip-path` and
+  `<use xlink:href>` ids per run, and `commit_cloud.py` lays words out
+  nondeterministically (two consecutive runs on the same `parse.json` differ).
+  The workable gate is a normalized comparison - mask the date, the
+  `[A-Za-z]+[0-9a-f]{10}` ids, and the `--out` path, then diff - under which
+  every pre-existing JSON, `digest.md`, and SVG except `cloud.svg` is identical.
+  Write the gate that way rather than reporting a false regression.
+- The latent `--structure` bug was real and its two failure modes differ: a
+  MISSING `tokei.json` raises an unhandled `FileNotFoundError` traceback, while
+  an EMPTY one (what a failed `tokei` actually leaves behind, since the
+  redirection creates the file before the command fails) gives a clean
+  "invalid JSON" error. Both killed the figure. `[[ -s ... ]]` covers both, and
+  omitting the flag is the documented degradation the scripts already support.
+- `--rows` was applied to only two of the six added analyses. The existing
+  `emit_spec` comment states the rule - bound by the analysis's OWN ranking, not
+  by Flint's canvas budget - and only `authors` (n_authors desc) and
+  `entity-churn` (added desc) sort by a rank. `entity-ownership`,
+  `main-developer-by-revisions` and `refactoring-main-developer` all sort by
+  `entity` ascending, so `--rows` there would silently cut alphabetically, which
+  is strictly worse than Flint's truncation because Flint self-labels the
+  omission. Verify the sort before bounding a table.
+
+## run.bash: making best-effort failures audible, and its first BATS suite (cod-2xfw)
+
+- `cd "${REPO}"` before `mkdir -p "${OUT}/figs"` made a relative `--out` resolve
+  against the ANALYZED repo, so `--out out/` wrote tens of megabytes into
+  someone else's checkout with nothing to warn you (`.local/`-style paths are
+  usually gitignored, so `git status` stays clean). Capture the invocation
+  directory up front and prefix a non-absolute `--out` with it. Use a glob test
+  (`[[ "${OUT}" = /* ]]`), not `realpath`: the directory does not exist yet and
+  BSD `realpath` has no `--canonicalize-missing`.
+- The jq rule - bind values, never interpolate them into program source - applies
+  one layer out to `python3 -c` too. An output path with an apostrophe turned the
+  one-liner into a `SyntaxError`, and `2>/dev/null || true` made the loss of the
+  complexity figure completely silent. A single-quoted program plus `sys.argv`
+  makes the class of bug impossible rather than merely fixed.
+- Redirecting a capture straight onto its target (`cmd >file`) truncates before
+  `cmd` runs. `run.bash` captured three schemas early, guarded its consumer
+  arrays on `[[ -s ... ]]`, then re-captured the same paths a hundred lines later
+  in `emit_spec`; one failing re-capture left an empty file that `digest.py`
+  already had `--schema` pointing at, and the run "succeeded" having lost
+  `digest.md`. Two fixes, both cheap: capture at most once, and write-then-`mv`
+  so a failure leaves the last good file.
+- A best-effort script's tolerance is the thing that hides its failures. Three of
+  the four bugs shared one signature: keep going, report success, quietly produce
+  less. The fix is not to make them fatal but to make them say so.
+- `mapfile` needs bash 4.0 and expanding a possibly-empty array under `nounset`
+  needs 4.4, but the preflight checked commands only, so macOS's bash 3.2.57 died
+  250 lines in with `mapfile: command not found`, after the analyses were written
+  and before the digest. `BASH_VERSINFO` is always set and safe under `nounset`;
+  check it in the same pass that checks the commands, and report every problem
+  rather than the first.
+- When emptiness is the signal, make the producer emit nothing. `print("\n".join(...))`
+  on an empty list still writes a newline, so `mapfile` returns one empty element
+  and an `-eq 0` guard never fires. A `for ... print(...)` loop yields zero lines.
+- `run_test.bats` is the repository's first BATS suite (`make build` gates Go
+  only; run it with `bats docs/skills/codelens/scripts/run_test.bats`). Stubbing
+  `codelens`, `git`, `tokei`, `uv` and `deno` on `PATH` makes the 400-line
+  orchestrator testable in under a second, and the stub only has to model the
+  surface the script calls. Note that `bats` presets `BATS_LIB_PATH` to the
+  system locations, so a `:=` default never applies; append the npm global root
+  instead of replacing it.

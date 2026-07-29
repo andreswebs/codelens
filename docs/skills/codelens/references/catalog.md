@@ -52,6 +52,7 @@ Before adding a card, find which lane already draws that chart.
 - **Consumes:** `codelens revisions` -> `entity, n_revs`.
 - **Sidecar:** `tokei --output json` (size). Optional; degrades to revisions-as-size.
 - **Command:** `uv run scripts/enclosure.py --weights revs.json --structure tokei.json -o hotspots.html`
+- **Pipeline:** `run.bash` writes this as `out/interactive/hotspots.html` (plus the reusable `out/interactive/hierarchy.json`).
 - **Static:** `uv run scripts/treemap.py --weights revs.json --structure tokei.json -o hotspots.svg` (embeddable SVG/PNG; same flags and structure-first node set as `enclosure.py`).
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** the **offender profile** is big + hot, but colour (change) is the lead
@@ -69,6 +70,7 @@ Before adding a card, find which lane already draws that chart.
   `--use-mailmap`, so a repo `.mailmap` collapses them for free; when there is no
   `.mailmap`, map aliases to a canonical name with `--team-map`.
 - **Command:** `uv run scripts/enclosure.py --weights main-dev.json --weight-col main_dev --categorical --structure tokei.json -o knowledge.html`
+- **Pipeline:** `run.bash` writes this as `out/interactive/knowledge.html`.
 - **Static:** `uv run scripts/treemap.py --weights main-dev.json --weight-col main_dev --categorical --structure tokei.json -o knowledge.svg`.
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Read:** one color per developer, circles sized by tokei LOC. With `--structure`
@@ -84,6 +86,7 @@ Before adding a card, find which lane already draws that chart.
 - **Consumes:** `codelens code-age` -> `entity, age_months`.
 - **Sidecar:** `tokei --output json`.
 - **Command:** `uv run scripts/enclosure.py --weights age.json --weight-col age_months --invert --structure tokei.json -o age.html`
+- **Pipeline:** `run.bash` writes this as `out/interactive/age.html`.
 - **Static:** `uv run scripts/treemap.py --weights age.json --weight-col age_months --invert --structure tokei.json -o age.svg`.
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Lane:** artifact, and **not** replaced (arbitrary path depth). The spec lane's
@@ -112,6 +115,7 @@ Before adding a card, find which lane already draws that chart.
 - **Consumes:** `codelens coupling` -> `entity, coupled, degree, average_revs`;
   `sum-of-coupling` for node weight.
 - **Command:** `uv run scripts/coupling_graph.py --coupling coupling.json -o coupling.html`
+- **Pipeline:** `run.bash` writes this as `out/interactive/coupling.html`, passing `--soc soc.json` for node size.
 - **Static:** `uv run scripts/pair_matrix.py --pairs coupling.json --a-col entity --b-col coupled --weight-col degree -o coupling.svg` (adjacency-matrix heatmap of the top-N most-coupled entities).
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Lane:** artifact. The static heatmap here is what the spec lane replaces; see
@@ -138,6 +142,7 @@ Before adding a card, find which lane already draws that chart.
   removed a spurious self-tie).
 - **Sidecar (optional):** `--team-map` to collapse authors to teams.
 - **Command:** `uv run scripts/dev_network.py --communication comm.json -o network.html`
+- **Pipeline:** `run.bash` writes this as `out/interactive/network.html`.
 - **Static:** `uv run scripts/pair_matrix.py --pairs comm.json --a-col author --b-col peer --weight-col strength --note 'coordination risk, not a performance ranking' -o network.svg`.
 - **Formats:** interactive HTML (iframe embed); static counterpart below.
 - **Lane:** artifact. The static heatmap here is what the spec lane replaces; see
@@ -303,6 +308,8 @@ it into an artifact. Shared conventions, stated once instead of on every card:
 
 - **Consumes:** `codelens authors` -> `entity, n_revs, n_authors`.
 - **Command:** `codelens authors --log git.log --rows 200 | uv run scripts/flint_spec.py --schema authors.schema.json -o authors.flint.json`
+- **Pipeline:** `run.bash` writes this spec as `out/flint/authors.flint.json`,
+  bounded with `--rows 100`.
 - **Chart:** `Scatter Plot`, **backend `vegalite`** (`x: n_revs`, `y: n_authors`).
 - **New chart:** the artifact lane has no counterpart, so nothing is replaced.
 - **`entity` is deliberately unbound.** `detail` is not a Scatter Plot channel in

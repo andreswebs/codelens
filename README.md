@@ -1,31 +1,38 @@
 # codelens
 
-`codelens` is an agent-first Go reimplementation of
-[code-maat](https://github.com/adamtornhill/code-maat). It mines a git history
-log and runs any of 20 evolutionary code analyses (coupling, hotspots, churn,
-ownership, code age, and more), emitting a structured JSON envelope by default.
+`codelens` turns a git history into structured, self-describing JSON: 18 analysis
+commands over a git log, one machine-readable envelope per run, and enough type
+information in that envelope for a downstream renderer to draw a chart without
+knowing anything about your repository.
 
-It is read-only: it never runs git, never writes files, and has no side
-effects. You generate a git log yourself and pipe it in; `codelens` analyzes it
-and prints results to stdout.
+It is strictly read-only. It never runs git, never writes files, and has no side
+effects. You generate a git log yourself and pipe it in.
+
+It is also agent-first. Every analysis is discoverable at runtime, results and
+diagnostics never share a stream, and the input format lives in the tool rather
+than in your memory.
 
 ## Why
 
-The original `code-maat` is a capable analysis engine wrapped in a CLI that is
-hard for an agent to drive: results and stack traces land on stdout, the input
-log format is undocumented at runtime, there is no schema introspection, and a
-single global flag no-ops for most analyses. `codelens` keeps the analyses and
-their numeric results while fixing the I/O surface:
+Evolutionary analysis reads a repository's history to find where change actually
+concentrates: which files churn together, which are owned by one person, which have
+gone quiet. The analyses are well established. What `codelens` adds is an I/O
+surface an agent or a script can drive without guessing:
 
-- JSON envelope by default, with coded errors on stderr only.
-- `schema` command so any analysis can be learned entirely at runtime.
-- `print-log-command` so no one has to memorize the input format.
-- Field projection (`--fields`) and row caps (`--rows`) for context discipline.
-- Per-analysis flags, so each command exposes only what affects it.
+- **One canonical JSON envelope** on stdout, always the same shape, never affected
+  by whether stdout is a terminal.
+- **Semantic typing.** Each output column is tagged with what it _means_
+  (`filepath`, `person`, `count`, `loc`, `percentage`, `duration_months`, ...), not
+  just its JSON type. This is what lets a renderer pick a size channel over a colour
+  channel correctly, and it is information only the tool that produced the data has.
+- **Runtime introspection.** `codelens schema` describes every command, flag,
+  column, error code and exit code, so nothing has to be memorised or hardcoded.
+- **Coded errors on stderr only**, with a documented exit-code taxonomy.
+- **Context discipline** via `--fields` and `--rows`, so a result fits in a budget.
 
 ## Install
 
-Via [Homebrew](https://brew.sh) (both Linux and Mac supported):
+Via [Homebrew](https://brew.sh) (Linux and macOS):
 
 ```sh
 brew tap andreswebs/tap
@@ -34,78 +41,43 @@ brew install andreswebs/tap/codelens
 
 ## Quick start
 
-`codelens` reads a git log on stdin. Do not memorize the format; ask `codelens` for
-the exact git command:
-
-```sh
-codelens print-log-command
-# git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN--%s' --no-renames
-```
-
-Let the shell run that command and pipe its output straight into one analysis
-subcommand, so the log format lives only in the tool:
+Ask `codelens` for the git command rather than memorising the log format, then pipe
+the log straight in:
 
 ```sh
 eval "$(codelens print-log-command)" | codelens coupling
 ```
 
-Scoping flags forward through the helper to git, so `--after=2024-01-01` and
-friends work without hardcoding the log format:
+Scoping flags forward through the helper to git, so a window needs no format
+knowledge:
 
 ```sh
-eval "$(codelens print-log-command --after=2024-01-01)" | codelens coupling
+eval "$(codelens print-log-command --after=2024-01-01)" | codelens revisions --rows 10
 ```
 
-The four fields (`%h`, `%ad`, `%aN`, `%s`) plus `--numstat` are what `codelens`
-requires. The trailing `%s` (commit subject) is what makes the `messages`
-analysis work; stock 3-field logs still parse, with the subject defaulting to
-`-`.
+Input defaults to stdin; `--log FILE` reads a file instead.
 
-Input defaults to stdin. Use `--log FILE` to read a file, or `--log -` to force
-stdin explicitly:
+## What it analyses
 
-```sh
-codelens authors --log "${CODELENS_LOG}"
-```
+18 commands, grouped by the question they answer. `codelens schema` is the
+authoritative list, including the terse aliases kept for compatibility.
 
-## The 20 analyses
+| Question                        | Commands                                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Where does change concentrate?  | `revisions`, `authors`, `code-age`                                                                                                  |
+| What changes together?          | `coupling`, `sum-of-coupling`                                                                                                       |
+| How much code moves, and where? | `absolute-churn`, `author-churn`, `entity-churn`                                                                                    |
+| Who knows this code?            | `main-developer`, `main-developer-by-revisions`, `refactoring-main-developer`, `entity-ownership`, `entity-effort`, `fragmentation` |
+| Who works alongside whom?       | `communication`                                                                                                                     |
+| Everything else                 | `summary`, `messages`, `parse`                                                                                                      |
 
-Each analysis has a descriptive canonical name and, where `code-maat` used a
-terse name, accepts that terse form as an alias. Run `codelens schema` for the
-authoritative list.
+The ownership and communication analyses describe **coordination and key-person
+risk, never individual performance**. That distinction is not decoration; it is the
+difference between a useful reading and a harmful one.
 
-| Canonical                     | Alias                  | Purpose                                               |
-| ----------------------------- | ---------------------- | ----------------------------------------------------- |
-| `authors`                     |                        | Number of distinct authors per entity                 |
-| `revisions`                   |                        | Change frequency per entity                           |
-| `coupling`                    |                        | Logical (temporal) coupling between entity pairs      |
-| `sum-of-coupling`             | `soc`                  | Sum of coupling per entity                            |
-| `summary`                     |                        | Overview counts for the mined data                    |
-| `absolute-churn`              | `abs-churn`            | Lines added/deleted per date                          |
-| `author-churn`                |                        | Lines added/deleted per author                        |
-| `entity-churn`                |                        | Lines added/deleted per entity                        |
-| `entity-ownership`            |                        | Per-author churn contribution to each entity          |
-| `entity-effort`               |                        | Each author revision share per entity                 |
-| `main-developer`              | `main-dev`             | Main developer per entity by lines added              |
-| `main-developer-by-revisions` | `main-dev-by-revs`     | Main developer per entity by revision count           |
-| `refactoring-main-developer`  | `refactoring-main-dev` | Main developer per entity by lines removed            |
-| `fragmentation`               |                        | Author fragmentation (fractal value) per entity       |
-| `communication`               |                        | Heuristic communication strength between author pairs |
-| `messages`                    |                        | Entity frequency for commit-message regex matches     |
-| `code-age`                    | `age`                  | Age in months since last modification                 |
-| `parse`                       | `identity`             | Dump parsed modification records (debug/interop)      |
+## What it produces
 
-That is 18 analysis subcommands. `coupling`'s `--verbose` variant and the
-`parse` dump round out code-maat's 20 analysis functions.
-
-## Output
-
-`codelens` emits exactly one thing on stdout: a single self-describing JSON
-envelope. There is no format selection; JSON is the one representation,
-identical whether or not stdout is a terminal. Nothing changes shape based on a
-TTY.
-
-### JSON envelope
+One envelope per run:
 
 ```json
 {
@@ -113,191 +85,127 @@ TTY.
   "ok": true,
   "analysis": "authors",
   "shape": "table",
-  "semantics": { "entity": "filepath", "n_authors": "count", "n_revs": "count" },
-  "row_count": 4,
-  "rows": [
-    { "entity": "src/code_maat/parsers/git2.clj", "n_authors": 2, "n_revs": 2 }
-  ]
+  "semantics": {
+    "entity": "filepath",
+    "n_authors": "count",
+    "n_revs": "count"
+  },
+  "row_count": 1,
+  "rows": [{ "entity": "src/parser.go", "n_authors": 2, "n_revs": 2 }]
 }
 ```
 
-- `shape` is the payload topology and names the payload key: a `table` result
-  carries `rows`. Every analysis is `table`; the only other member is `text`, for
-  `print-log-command`. The set names only what the binary emits, so a new shape
-  arrives with the analysis that needs it rather than being announced ahead of
-  time.
-- `semantics` maps each column to a semantic type (`filepath`, `count`,
-  `percentage`, `duration_months`, and so on). This is what lets a downstream
-  renderer derive a chart without domain knowledge: `codelens` authored the
-  data, so it knows what each column means.
-- `row_count` is the number of rows emitted.
-- When `--rows N` truncates the result, the envelope also carries
-  `total_count` (rows before the cap) and `truncated: true`, so a capped result
-  is distinguishable from a complete one.
-- An empty-but-valid result is `ok: true`, `row_count: 0`, `rows: []`, exit 0.
-- Column keys are `snake_case`. The `parse` command dumps records in log order;
-  every other analysis sorts deterministically.
+Three fields carry the self-description:
 
-### Transforms and what a column means
+- **`shape`** names the payload topology, and the payload key follows from it
+  (`table` carries `rows`). The set holds only what the binary actually emits, so a
+  shape read from `schema` is never a promise the tool cannot keep.
+- **`semantics`** maps each column to its meaning. A transform that destroys
+  structure degrades the semantic: under `--group`, a splittable `filepath` becomes
+  an opaque `label`. A transform that merely aggregates does not, so `--team-map`
+  keeps `author` as `person`.
+- **`transforms`** records which pipeline transforms ran, and is absent entirely on
+  a pass-through run.
 
-When a pipeline transform runs, the envelope carries a `transforms` object
-recording which ones ran (`include`, `exclude`, `group`, `temporal_period`,
-`team_map`); it is absent on a pass-through run. A transform can change what a
-column means, and `semantics` follows: `--group` collapses file paths into
-architectural layers, so `entity` becomes a `label` rather than a `filepath`
-(its `/`-splittable structure is gone). A transform that only aggregates does
-not degrade the semantic: under `--team-map`, `author` stays `person`, because a
-team name and a person name are both opaque categorical actor labels.
+`schema` additionally publishes an **`aggregation_roles`** map, stating how a value
+of each semantic may be combined: `count` and `loc` are `additive`, while
+`percentage`, `ratio` and `duration_months` are `intensive` and must not be summed
+into a reported total. Consumers use it to check an aggregation instead of assuming
+one.
 
-```json
-{
-  "schema_version": 1,
-  "ok": true,
-  "analysis": "authors",
-  "shape": "table",
-  "semantics": { "entity": "label", "n_authors": "count", "n_revs": "count" },
-  "transforms": { "group": true },
-  "row_count": 2,
-  "rows": [{ "entity": "Parsers", "n_authors": 2, "n_revs": 4 }]
-}
-```
+Errors are the same envelope with `ok: false` and a coded `error` object, on stderr.
+Exit codes follow a fixed taxonomy: `0` success including empty results, `64` usage,
+`65` data, `70` internal, `74` I/O.
 
-### Bounding output (`--fields`, `--rows`)
+Full CLI reference, including every flag, transform, error code and the analysis
+catalog: [operating.md](docs/skills/codelens/references/operating.md).
 
-On a real repository, cap what you read and project only the columns you need:
+## Visualizing
+
+`codelens` is the data plane; rendering lives in an
+[agent skill](docs/skills/codelens/SKILL.md) that ships with the repository. It
+draws from two lanes, and the split between them is fixed so no chart grows two
+competing recipes:
+
+- The **artifact lane** is a set of self-contained Python scripts that write
+  finished output: zoomable circle-packing maps (hotspot, ownership, code age),
+  change-coupling and team-communication graphs as interactive HTML, and static
+  SVG/PNG for churn trends, fractal effort figures, complexity trends, a commit word
+  cloud and summary tiles. Needs `uv` only.
+- The **spec lane** emits a [Flint](https://github.com/microsoft/flint-chart) chart
+  spec, which Flint compiles to Vega-Lite or ECharts. It covers the edge tables as
+  network graphs, the churn trend, summary KPI cards, a code-age histogram, and
+  several charts the artifact lane has no counterpart for. Renders headless through
+  Deno, or interactively through the flint-chart MCP server.
+
+Semantic typing is what makes the spec lane cheap: because every column already
+declares what it means, translating a result into a chart spec is close to a
+rename rather than a per-analysis special case.
+
+One command produces every analysis, both lanes, and a grounding digest for a
+whole repository:
 
 ```sh
-codelens authors --log "${CODELENS_LOG}" \
-  --fields rows.entity,rows.n_authors --rows 2
+bash docs/skills/codelens/scripts/run.bash --repo "${REPO}" --out out/
 ```
 
-```json
-{
-  "ok": true,
-  "rows": [
-    { "entity": "src/code_maat/parsers/git2.clj", "n_authors": 2 },
-    { "entity": "src/code_maat/parsers/git.clj", "n_authors": 1 }
-  ],
-  "schema_version": 1,
-  "semantics": { "entity": "filepath", "n_authors": "count" },
-  "shape": "table"
-}
-```
+From there, `report.py` assembles a single self-contained markdown report with a
+fixed eleven-section sequence, figures embedded inline, and the coordination-risk
+guardrails always present. See
+[reporting.md](docs/skills/codelens/references/reporting.md).
 
-`--fields` always retains `schema_version`, `ok`, and `shape`; it retains
-`transforms` when present, and narrows `semantics` to the projected columns.
-`--rows` caps the payload after sorting (0 = all).
+### Installing the skill
 
-## Schema introspection
-
-Never guess flags or column names. Learn them from `schema`:
-
-```sh
-codelens schema                    # list every command, its aliases and exit codes
-codelens schema --command coupling # full contract for one command
-```
-
-`schema --command CMD` returns the command summary, its `shape`, its `flags`
-(`name`, `type`, `default`, `required`, `desc`), its `row_schema`
-(`name`, `type`, `semantic`, `desc` per output column), its `error_codes`, and
-its `exit_codes`. This is the source of truth for what each analysis accepts and
-emits, including columns that appear only with `--verbose`. The schema declares
-the command's untransformed default: it always reports `entity` as `filepath`,
-while an envelope emitted under `--group` reports it as `label`.
-
-## Common flags
-
-Global flags apply to every analysis subcommand; per-command flags are listed
-by `schema --command CMD`. The ones you will reach for most:
-
-| Flag                  | Meaning                                                          |
-| --------------------- | ---------------------------------------------------------------- |
-| `--log FILE`          | Read the log from FILE instead of stdin (`-` forces stdin).      |
-| `--fields PATHS`      | Project JSON fields, e.g. `rows.entity,rows.degree`.             |
-| `--rows N`            | Cap output to N rows after sorting (0 = all).                    |
-| `--group FILE`        | Map files to architectural layers (`--group-format text\|json`). |
-| `--team-map FILE`     | Map authors to teams (`--team-map-format csv\|json`).            |
-| `--temporal-period N` | Collapse commits into sliding N-day change sets.                 |
-| `--expression REGEX`  | Required by `messages`: regex matched against commit subjects.   |
-| `--time-now DATE`     | `code-age` only: `YYYY-MM-DD` "time zero" (default: today, UTC). |
-
-## Errors and exit codes
-
-All diagnostics go to stderr; stdout carries only results, so piping stdout
-into a JSON parser is always safe. Errors are a JSON envelope:
-
-```json
-{
-  "schema_version": 1,
-  "ok": false,
-  "error": {
-    "code": "empty_log",
-    "message": "the log is empty",
-    "hint": "provide a non-empty git2 log on stdin or via --log"
-  }
-}
-```
-
-Exit codes follow the exit-code taxonomy in
-[ADR 0002](docs/adr/0002-exit-code-taxonomy.md):
-
-| Exit | Meaning               | Examples                                                                  |
-| ---- | --------------------- | ------------------------------------------------------------------------- |
-| 0    | success (incl. empty) | any analysis that ran                                                     |
-| 64   | usage error           | unknown flag or subcommand, bad flag value, `messages` without expression, malformed glob/group |
-| 65   | data error            | empty or unparseable log, malformed `--team-map`, churn on a log with no numstat |
-| 70   | internal / unexpected | a bug; an unexpected internal fault, reported as a one-line coded error   |
-| 74   | I/O error             | unreadable `--log`, `--group`, or `--team-map` file                       |
-
-## Visualizing with the `codelens` skill
-
-`codelens` ships an [agent skill](docs/skills/codelens/SKILL.md) that both drives
-the CLI and turns its JSON into the crime-scene visualizations from Adam
-Tornhill's [_Your Code as a Crime Scene_](https://isbnsearch.org/isbn/9798888650844).
-The recurring subject is the hotspot: complex code that changes often.
-
-It renders:
-
-- Hotspot enclosure maps, knowledge/ownership maps, and code-age maps
-  (circle-packing, from `revisions`, `main-developer`, `code-age`).
-- Change-coupling and team-communication graphs (from `coupling`,
-  `sum-of-coupling`, `communication`).
-- Churn and complexity trends, fractal effort figures, a commit word cloud, and
-  summary tiles.
-
-Static charts render to SVG and PNG for slides and PDF; the enclosure and graph
-views render to interactive HTML.
-
-Install it into any supported agent (Claude Code, Codex, Cursor, and others)
-with the [Vercel skills CLI](https://github.com/vercel-labs/skills):
+Into any supported agent (Claude Code, Codex, Cursor and others) with the
+[Vercel skills CLI](https://github.com/vercel-labs/skills):
 
 ```sh
 npx skills add andreswebs/codelens
 ```
 
-That discovers the skill under `docs/skills/codelens` and installs it. To add
-only this skill, globally, for Claude Code:
+Or just this skill, globally, for Claude Code:
 
 ```sh
 npx skills add andreswebs/codelens --skill codelens -g -a claude-code
 ```
 
-Once installed, ask the agent to visualize a repository and it follows the
-skill's pipeline (frame the question, collect the log, build the artifact,
-render, read the crime scene).
-
 ## Documentation
 
-- [docs/skills/codelens/](docs/skills/codelens/) - the skill: operate the CLI
-  and visualize its output, including the full analyses catalog and the
-  visualization cards.
-- [docs/skills/codelens/references/operating.md](docs/skills/codelens/references/operating.md)
-  - the canonical CLI operating guide (the fuller reference behind this README).
-- [AGENTS.md](AGENTS.md) - repository map and the build, validate, and
-  contribution guide.
-- [docs/adr/0008-canonical-output-representation.md](docs/adr/0008-canonical-output-representation.md)
-  - the decision behind the single self-describing envelope (`shape`,
-  `semantics`, `transforms`) and the removal of the format matrix.
+- [docs/skills/codelens/](docs/skills/codelens/) - the skill: operating the CLI and
+  rendering its output.
+  - [operating.md](docs/skills/codelens/references/operating.md) - the canonical
+    CLI reference.
+  - [catalog.md](docs/skills/codelens/references/catalog.md) - every chart, its
+    inputs and its lane.
+  - [interpretation.md](docs/skills/codelens/references/interpretation.md) - how to
+    read a result, and how not to misuse the social analyses.
+  - [flint.md](docs/skills/codelens/references/flint.md) - the spec lane and both
+    rendering paths.
+  - [reporting.md](docs/skills/codelens/references/reporting.md) - the report
+    pipeline.
+- [docs/adr/](docs/adr/) - architecture decisions, including
+  [0008](docs/adr/0008-canonical-output-representation.md) on the canonical
+  envelope and [0002](docs/adr/0002-exit-code-taxonomy.md) on exit codes.
+- [AGENTS.md](AGENTS.md) - repository map, build, and contribution guide.
+
+## Provenance and influences
+
+`codelens` began as a Go port of
+[code-maat](https://github.com/adamtornhill/code-maat) by
+[Adam Tornhill](https://github.com/adamtornhill), and the analyses and their
+algorithms originate there. It still uses code-maat's test corpus (fixtures, sample
+logs and expected outputs) as its regression oracle, which is what keeps the numbers
+honest.
+
+The visualization vocabulary draws on several sources. Tornhill's
+[_Your Code as a Crime Scene_](https://isbnsearch.org/isbn/9798888650844) is where
+the hotspot, knowledge-map and fractal-figure readings come from. The circle-packing
+map is the same idea as GitHub Next's
+[repo-visualization](https://githubnext.com/projects/repo-visualization/), with the
+colour channel carrying an evolutionary metric rather than file type.
+[Flint](https://github.com/microsoft/flint-chart) supplies the chart grammar for the
+spec lane. Nothing here is tied to a single framework; the envelope is the contract,
+and renderers are interchangeable.
 
 ## Authors
 
@@ -305,10 +213,4 @@ render, read the crime scene).
 
 ## License
 
-This project is licensed under the [GPL-3.0-or-later](LICENSE), matching
-code-maat. It reuses code-maat's test corpus (fixtures, sample logs, and
-expected outputs) as its regression oracle.
-
-`codelens` is a port of [code-maat](https://github.com/adamtornhill/code-maat) by
-[Adam Tornhill](https://github.com/adamtornhill). The analyses and their
-algorithms originate there.
+[GPL-3.0-or-later](LICENSE).

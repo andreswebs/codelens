@@ -16,11 +16,15 @@ Run: `uv run digest_test.py` from the scripts directory.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
+
+from digest import STOP
 
 SCRIPT = Path(__file__).with_name("digest.py")
 
@@ -141,20 +145,109 @@ class TestChurn(DigestCase):
 
 
 class TestVocabulary(DigestCase):
-    def test_stopwords_dropped(self) -> None:
+    # parse emits one row per (commit, file), so every fixture below carries an
+    # explicit `rev`: the per-commit tally is the whole point of these tests.
+    @staticmethod
+    def parse_rows(commits: dict[str, tuple[str, int]]) -> list[dict[str, object]]:
+        """`rev -> (message, files_touched)` expanded into parse.json rows."""
+        return [
+            {"rev": rev, "message": msg, "entity": f"src/{rev}_{i}.py"}
+            for rev, (msg, files) in commits.items()
+            for i in range(files)
+        ]
+
+    @staticmethod
+    def counts(vocab: str) -> dict[str, int]:
+        return {m[1]: int(m[2]) for m in re.finditer(r"(\w[\w-]*)\((\d+)\)", vocab)}
+
+    def vocab_of(self, rows: list[dict[str, object]], commits: int) -> str:
         _rc, _stderr, md = self.run_digest(
             {
-                "summary.json": [{"statistic": "number-of-commits", "value": 2}],
-                "parse.json": [
-                    {"message": "fix the disbursement service"},
-                    {"message": "disbursement retry disbursement"},
-                ],
+                "summary.json": [{"statistic": "number-of-commits", "value": commits}],
+                "parse.json": rows,
             }
         )
-        vocab = md.split("## commit vocabulary", 1)[1]
+        return md.split("## commit vocabulary", 1)[1]
+
+    def test_stopwords_dropped(self) -> None:
+        vocab = self.vocab_of(
+            self.parse_rows(
+                {
+                    "aaa1111": ("fix the disbursement service", 1),
+                    "bbb2222": ("disbursement retry disbursement", 1),
+                }
+            ),
+            commits=2,
+        )
         self.assertIn("disbursement(3)", vocab)
         self.assertNotIn("the(", vocab)  # stop word
         self.assertNotIn("fix(", vocab)  # stop word
+
+    def test_message_counted_once_per_commit(self) -> None:
+        # One commit touching 50 files contributes its message exactly once.
+        vocab = self.vocab_of(
+            self.parse_rows({"aaa1111": ("disbursement rollout", 50)}), commits=1
+        )
+        self.assertIn("disbursement(1)", vocab)
+        self.assertNotIn("disbursement(50)", vocab)
+
+    def test_wide_commits_do_not_outrank_frequent_terms(self) -> None:
+        # The defect this pins: per-row counting inflates each term by its average
+        # files-per-commit, which REORDERS the ranking. `sweep` is in one 10-file
+        # commit; `disbursement` is in three 1-file commits. Per row sweep wins
+        # 10 to 3; per commit disbursement wins 3 to 1.
+        rows = self.parse_rows(
+            {
+                "aaa1111": ("sweep rename", 10),
+                "bbb2222": ("disbursement retry", 1),
+                "ccc3333": ("disbursement timeout", 1),
+                "ddd4444": ("disbursement ledger", 1),
+            }
+        )
+        counts = self.counts(self.vocab_of(rows, commits=4))
+        self.assertEqual(counts["sweep"], 1)
+        self.assertEqual(counts["disbursement"], 3)
+        vocab = self.vocab_of(rows, commits=4)
+        self.assertLess(vocab.index("disbursement("), vocab.index("sweep("))
+
+    def test_ranking_agrees_with_commit_cloud(self) -> None:
+        # commit_cloud.py dedupes by `rev` and is the reference implementation
+        # (the two sit on the same report page and must not contradict each
+        # other). Its algorithm, replicated here over digest's tokens/stopwords.
+        commits = {
+            "aaa1111": ("sweep rename generated", 12),
+            "bbb2222": ("disbursement retry backoff", 1),
+            "ccc3333": ("disbursement timeout backoff", 2),
+            "ddd4444": ("disbursement ledger reconcile", 1),
+            "eee5555": ("backoff jitter", 3),
+        }
+        rows = self.parse_rows(commits)
+
+        by_rev = {rev: msg for rev, (msg, _files) in commits.items()}
+        reference: Counter[str] = Counter()
+        for msg in by_rev.values():
+            for tok in re.findall(r"[a-z][a-z0-9_-]{2,}", msg.lower()):
+                if tok not in STOP:
+                    reference[tok] += 1
+
+        digest_counts = self.counts(self.vocab_of(rows, commits=len(commits)))
+        self.assertEqual(digest_counts, dict(reference.most_common(20)))
+        # Ranking, not just counts: same order as the reference.
+        self.assertEqual(list(digest_counts), [w for w, _ in reference.most_common(20)])
+
+    def test_denominator_is_reported(self) -> None:
+        # A bare count is not a finding; the digest states what it is out of.
+        vocab = self.vocab_of(
+            self.parse_rows(
+                {
+                    "aaa1111": ("disbursement rollout", 4),
+                    "bbb2222": ("disbursement retry", 7),
+                }
+            ),
+            commits=2,
+        )
+        self.assertIn("2 commits", vocab)
+        self.assertNotIn("11 commits", vocab)  # the row count, not the commit count
 
 
 class TestWindow(DigestCase):
